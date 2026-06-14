@@ -218,7 +218,9 @@ async function validateAssetStartFile(relativePath, packageDir) {
     throw httpError(400, 'info.json startFile escapes the package directory.');
   }
   const stat = await fs.promises.stat(target).catch(() => null);
-  if (!stat?.isFile()) throw httpError(400, 'info.json startFile does not exist as a file.');
+  if (!stat?.isFile()) {
+    throw httpError(400, `info.json startFile does not exist as a file: ${relativePath}`);
+  }
 }
 
 function extractZip(zipPath, extractDir) {
