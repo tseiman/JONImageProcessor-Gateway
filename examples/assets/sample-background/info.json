@@ -1,0 +1,7 @@
+{
+  "name": "Sample Background",
+  "version": "1.0.0",
+  "description": "Example image asset package for background or pause uploads.",
+  "type": "Image",
+  "startFile": "sample_background.jpg"
+}

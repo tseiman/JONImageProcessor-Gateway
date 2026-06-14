@@ -81,6 +81,8 @@ Media assets are uploaded as ZIP packages only. Each ZIP must contain exactly on
 
 Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is accepted as an alias for `startFile`. The ZIP is unpacked into the configured root as its own asset directory, for example `/opt/JONImageProcessor/backgrounds/studio-background/info.json`.
 
+A complete image asset example is available in `examples/assets/sample-background/`. See `examples/README.md` for ZIP and upload commands.
+
 ## Authentication
 
 The gateway requires a token at startup. The easiest setup is an environment file:
