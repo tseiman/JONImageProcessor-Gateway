@@ -1,17 +1,23 @@
 import { createHash } from 'node:crypto';
 import { extractToken, isAuthorized } from './auth.js';
 import { handleIpcRequest } from './ipcGateway.js';
+import { errorFields, log } from './logger.js';
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 export function handleUpgrade(req, socket, head, config) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname !== '/api/ws') {
+    log('warn', 'Rejected WebSocket upgrade for unknown path', { path: url.pathname });
     socket.destroy();
     return;
   }
   const token = extractToken(req, config, url);
   if (!isAuthorized(token, config)) {
+    log('warn', 'Rejected unauthorized WebSocket upgrade', {
+      path: url.pathname,
+      remoteAddress: req.socket.remoteAddress
+    });
     socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;
@@ -19,6 +25,7 @@ export function handleUpgrade(req, socket, head, config) {
 
   const key = req.headers['sec-websocket-key'];
   if (!key) {
+    log('warn', 'Rejected WebSocket upgrade without Sec-WebSocket-Key', { path: url.pathname });
     socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;
@@ -37,9 +44,21 @@ export function handleUpgrade(req, socket, head, config) {
   connection.onMessage = async (message) => {
     try {
       const body = JSON.parse(message);
+      log('info', 'WebSocket IPC request received', {
+        ipcCommand: body?.cmd,
+        ipcKey: body?.key
+      });
       const response = await handleIpcRequest(body, config);
+      if (response.ok === false) {
+        log('warn', 'WebSocket IPC request failed', {
+          ipcCommand: body?.cmd,
+          ipcKey: body?.key,
+          ipcError: response.error
+        });
+      }
       connection.sendJson(response);
     } catch (error) {
+      log('warn', 'WebSocket message handling failed', errorFields(error));
       connection.sendJson({ ok: false, error: error.message });
     }
   };

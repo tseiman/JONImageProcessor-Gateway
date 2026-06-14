@@ -3,13 +3,18 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import os from 'node:os';
 import yauzl from 'yauzl';
+import { log } from './logger.js';
 
 const ALLOWED_TYPES = new Set(['Image', 'Video', 'HTML App']);
 
 export async function listFiles(rootName, config) {
   const root = rootConfig(rootName, config);
+  log('info', 'Listing asset root', { rootName, rootPath: root.path });
   const entries = await fs.promises.readdir(root.path, { withFileTypes: true }).catch((error) => {
-    if (error.code === 'ENOENT') return [];
+    if (error.code === 'ENOENT') {
+      log('warn', 'Asset root does not exist; returning empty list', { rootName, rootPath: root.path });
+      return [];
+    }
     throw error;
   });
   const files = await Promise.all(entries
@@ -17,7 +22,13 @@ export async function listFiles(rootName, config) {
     .map(async (entry) => {
       try {
         return await readAssetMetadata(rootName, entry.name, config, { publicView: true });
-      } catch {
+      } catch (error) {
+        log('warn', 'Ignoring invalid asset directory while listing', {
+          rootName,
+          assetName: entry.name,
+          rootPath: root.path,
+          error: error.message
+        });
         return null;
       }
     }));
@@ -36,6 +47,13 @@ export async function uploadFile(req, rootName, fileName, config) {
   const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'jon-gateway-upload-'));
   const zipPath = path.join(tempDir, 'asset.zip');
   const extractDir = path.join(tempDir, 'extract');
+  log('info', 'Asset upload started', {
+    rootName,
+    rootPath: root.path,
+    fileName,
+    contentLength,
+    tempDir
+  });
 
   let received = 0;
   req.on('data', (chunk) => {
@@ -60,7 +78,16 @@ export async function uploadFile(req, rootName, fileName, config) {
     const target = resolvePackageTarget(root, packageDirName);
     await fs.promises.rm(target, { recursive: true, force: true });
     await fs.promises.rename(extractedPackageDir, target);
-    return await readAssetMetadata(rootName, packageDirName, config, { publicView: true });
+    const publicMetadata = await readAssetMetadata(rootName, packageDirName, config, { publicView: true });
+    log('info', 'Asset upload completed', {
+      rootName,
+      rootPath: root.path,
+      assetName: packageDirName,
+      target,
+      type: publicMetadata.type,
+      version: publicMetadata.version
+    });
+    return publicMetadata;
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
   }
@@ -70,6 +97,7 @@ export async function deleteFile(rootName, assetName, config) {
   const root = rootConfig(rootName, config);
   if (!root.allowDelete) throw httpError(403, 'Deletes are disabled for this root.');
   const target = resolvePackageTarget(root, assetName);
+  log('warn', 'Deleting asset directory', { rootName, assetName, target });
   await fs.promises.rm(target, { recursive: true, force: false });
   return { deleted: path.basename(target) };
 }

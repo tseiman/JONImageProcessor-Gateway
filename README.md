@@ -166,10 +166,18 @@ curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/files/backgrounds
 ```
 
-Upload a ZIP asset package with raw HTTP `PUT`:
+Upload a ZIP asset package with raw HTTP `PUT` or `POST`. `POST` is accepted because `curl --data-binary` uses `POST` unless `-X PUT` is specified:
 
 ```bash
 curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  --data-binary @studio-background.zip \
+  http://127.0.0.1:8080/api/files/backgrounds/studio-background.zip
+```
+
+Equivalent `POST` upload:
+
+```bash
+curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   --data-binary @studio-background.zip \
   http://127.0.0.1:8080/api/files/backgrounds/studio-background.zip
 ```
@@ -238,6 +246,12 @@ Inspect logs:
 
 ```bash
 journalctl -u jonimageprocessor-gateway.service -f
+```
+
+The gateway writes JSON log records with systemd/journald priority prefixes. Failed requests include method, path, status, remote address, duration, and the error message. For recent errors:
+
+```bash
+journalctl -u jonimageprocessor-gateway.service -p warning -n 100 --no-pager
 ```
 
 If the Unix socket is owned by another user or group, adjust the `User=`, `Group=`, or supplementary groups in the unit so the gateway can connect to it.

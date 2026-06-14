@@ -6,11 +6,26 @@ import { sendIpcRequest } from './ipcClient.js';
 import { deleteFile, httpError, listFiles, uploadFile } from './fileStore.js';
 import { handleUpgrade } from './websocket.js';
 import { prepareIpcRequest } from './ipcGateway.js';
+import { errorFields, log } from './logger.js';
 
 const config = loadConfig();
+let nextRequestId = 1;
 
 const server = http.createServer(async (req, res) => {
+  const requestId = nextRequestId++;
+  const started = process.hrtime.bigint();
   const url = new URL(req.url, `http://${req.headers.host}`);
+  log('info', 'HTTP request started', requestLogFields(req, url, requestId));
+  res.on('finish', () => {
+    const durationMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    log(level, 'HTTP request completed', {
+      ...requestLogFields(req, url, requestId),
+      status: res.statusCode,
+      durationMs: Math.round(durationMs * 1000) / 1000
+    });
+  });
+
   try {
     if (req.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
       writeCorsHeaders(req, res);
@@ -26,6 +41,7 @@ const server = http.createServer(async (req, res) => {
 
     const token = extractToken(req, config, url);
     if (!isAuthorized(token, config)) {
+      log('warn', 'Unauthorized request rejected', requestLogFields(req, url, requestId));
       await writeJson(req, res, 401, { ok: false, error: 'Unauthorized.' });
       return;
     }
@@ -39,10 +55,29 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const prepared = await prepareIpcRequest(body, config);
       if (!prepared.ok) {
+        log('warn', 'IPC request rejected by gateway validation', {
+          ...requestLogFields(req, url, requestId),
+          ipcCommand: body?.cmd,
+          ipcKey: body?.key,
+          validationError: prepared.error
+        });
         await writeJson(req, res, 400, { ok: false, error: prepared.error });
         return;
       }
+      log('info', 'Forwarding IPC request', {
+        ...requestLogFields(req, url, requestId),
+        ipcCommand: prepared.request.cmd,
+        ipcKey: prepared.request.key
+      });
       const response = await sendIpcRequest(prepared.request, config);
+      if (response.ok === false) {
+        log('warn', 'JONImageProcessor IPC returned an error', {
+          ...requestLogFields(req, url, requestId),
+          ipcCommand: prepared.request.cmd,
+          ipcKey: prepared.request.key,
+          ipcError: response.error
+        });
+      }
       await writeJson(req, res, response.ok === false ? 502 : 200, response);
       return;
     }
@@ -55,7 +90,7 @@ const server = http.createServer(async (req, res) => {
         await writeJson(req, res, 200, { ok: true, files: await listFiles(root, config) });
         return;
       }
-      if (req.method === 'PUT' && fileName) {
+      if ((req.method === 'PUT' || req.method === 'POST') && fileName) {
         await writeJson(req, res, 201, { ok: true, file: await uploadFile(req, root, fileName, config) });
         return;
       }
@@ -63,19 +98,57 @@ const server = http.createServer(async (req, res) => {
         await writeJson(req, res, 200, { ok: true, file: await deleteFile(root, fileName, config) });
         return;
       }
+      await writeJson(req, res, 405, {
+        ok: false,
+        error: fileName
+          ? 'Method not allowed for asset. Use PUT or POST to upload, DELETE to delete.'
+          : 'Method not allowed for asset list. Use GET.'
+      });
+      return;
     }
 
     await writeJson(req, res, 404, { ok: false, error: 'Not found.' });
   } catch (error) {
     const status = error.status ?? 500;
+    log(status >= 500 ? 'error' : 'warn', 'HTTP request failed', {
+      ...requestLogFields(req, url, requestId),
+      ...errorFields(error)
+    });
     await writeJson(req, res, status, { ok: false, error: error.message });
   }
 });
 
-server.on('upgrade', (req, socket, head) => handleUpgrade(req, socket, head, config));
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  log('info', 'WebSocket upgrade requested', {
+    method: req.method,
+    path: url.pathname,
+    remoteAddress: req.socket.remoteAddress
+  });
+  handleUpgrade(req, socket, head, config);
+});
+
+server.on('error', (error) => {
+  log('error', 'HTTP server error', errorFields(error));
+});
 
 server.listen(config.server.port, config.server.host, () => {
-  console.log(`JONImageProcessor Gateway listening on http://${config.server.host}:${config.server.port}`);
+  log('info', 'JONImageProcessor Gateway listening', {
+    host: config.server.host,
+    port: config.server.port,
+    configPath: config.__path,
+    ipcSocket: config.jonImageProcessor.ipcSocket
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  log('error', 'Uncaught exception', errorFields(error));
+  process.exitCode = 1;
+});
+
+process.on('unhandledRejection', (reason) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  log('error', 'Unhandled promise rejection', errorFields(error));
 });
 
 async function readJson(req) {
@@ -114,4 +187,15 @@ function writeCorsHeaders(req, res) {
     res.setHeader('access-control-allow-headers', 'authorization,x-api-token,content-type');
     res.setHeader('access-control-max-age', '600');
   }
+}
+
+function requestLogFields(req, url, requestId) {
+  return {
+    requestId,
+    method: req.method,
+    path: url.pathname,
+    remoteAddress: req.socket.remoteAddress,
+    userAgent: req.headers['user-agent'],
+    contentLength: req.headers['content-length']
+  };
 }
