@@ -9,7 +9,7 @@ Node.js gateway for the local `JONImageProcessor` runtime IPC API. The gateway e
 - Node.js 20 or newer. Node.js 22 is recommended.
 - A running `JONImageProcessor` process with IPC enabled.
 - The gateway user must have read/write access to the configured media folders and access to the Unix socket.
-- No npm package install is currently required; the service uses only Node.js built-in modules.
+- npm project dependencies installed with `npm install`.
 
 ## Configuration
 
@@ -30,6 +30,20 @@ The important settings are:
 - `api.commands`: allowed `list`, `get`, and `set` IPC operations plus value validation for each writable key.
 
 The config is also intended as the future WebUI schema. `/api/schema` returns the allowed API shape without secrets.
+
+Media assets are uploaded as ZIP packages only. Each ZIP must contain exactly one top-level directory. That directory must contain an `info.json` file with:
+
+```json
+{
+  "name": "Studio Background",
+  "version": "1.0.0",
+  "description": "Short description for the UI",
+  "type": "Image",
+  "startFile": "background.jpg"
+}
+```
+
+Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is accepted as an alias for `startFile`. The ZIP is unpacked into the configured root as its own asset directory, for example `/opt/JONImageProcessor/backgrounds/studio-background/info.json`.
 
 ## Authentication
 
@@ -70,6 +84,7 @@ JON_GATEWAY_CONFIG=/etc/jonimageprocessor-gateway/config.json JON_GATEWAY_TOKEN=
 Syntax check:
 
 ```bash
+npm install
 npm run check
 ```
 
@@ -106,27 +121,29 @@ curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/ipc
 ```
 
-List uploaded media in a configured root:
+List uploaded assets in a configured root. The response contains metadata from `info.json`, not raw file names:
 
 ```bash
 curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/files/backgrounds
 ```
 
-Upload a file with raw HTTP `PUT`:
+Upload a ZIP asset package with raw HTTP `PUT`:
 
 ```bash
 curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
-  --data-binary @background.jpg \
-  http://127.0.0.1:8080/api/files/backgrounds/background.jpg
+  --data-binary @studio-background.zip \
+  http://127.0.0.1:8080/api/files/backgrounds/studio-background.zip
 ```
 
-Delete a file:
+Delete an asset directory:
 
 ```bash
 curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
-  http://127.0.0.1:8080/api/files/backgrounds/background.jpg
+  http://127.0.0.1:8080/api/files/backgrounds/studio-background
 ```
+
+When a client sets `background.image` or `pause.image`, it sends the asset id, for example `studio-background`. The gateway reads that asset's `info.json`, resolves `startFile`, and forwards the relative package path such as `studio-background/background.jpg` to the `JONImageProcessor` Unix socket API.
 
 ## WebSocket API
 
@@ -147,6 +164,12 @@ Responses are the JSON responses from `JONImageProcessor`, or a gateway validati
 ## systemd
 
 Install the application under `/opt/JONImageProcessor-Gateway`, configure `/etc/jonimageprocessor-gateway/config.json`, and create `/etc/jonimageprocessor-gateway/token.env` as shown above.
+
+Install dependencies from the project directory:
+
+```bash
+npm install --omit=dev
+```
 
 Copy and enable the unit:
 

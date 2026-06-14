@@ -20,13 +20,15 @@
         "path": "/opt/JONImageProcessor/backgrounds",
         "allowUpload": true,
         "allowDelete": true,
-        "allowedExtensions": [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".html", ".htm"]
+        "allowedExtensions": [".zip"],
+        "ipcKey": "background.image"
       },
       "pause": {
         "path": "/opt/JONImageProcessor/pause",
         "allowUpload": true,
         "allowDelete": true,
-        "allowedExtensions": [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".html", ".htm"]
+        "allowedExtensions": [".zip"],
+        "ipcKey": "pause.image"
       }
     }
   },
@@ -66,7 +68,7 @@
         "items": {
           "camera.enabled": { "type": "boolean" },
           "pause.enabled": { "type": "boolean" },
-          "pause.image": { "type": "string", "pattern": "^[^/\\\\][^\\\\]*$", "maxLength": 255 },
+          "pause.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "pause" },
           "pause.loopIfVideo": { "type": "boolean" },
           "pause.showStatusText": { "type": "boolean" },
           "pause.textColor": { "type": "string", "pattern": "^[0-9a-fA-F]{8}$" },
@@ -77,7 +79,7 @@
           "segmentation.smoothing": { "type": "number", "min": 0, "max": 1 },
           "segmentation.morphology": { "type": "string", "enum": ["off", "light", "strong"] },
           "background.effect": { "type": "string", "enum": ["none", "color", "blur", "image"] },
-          "background.image": { "type": "string", "pattern": "^[^/\\\\][^\\\\]*$", "maxLength": 255 },
+          "background.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "backgrounds" },
           "background.loopIfVideo": { "type": "boolean" },
           "background.overlayColor": { "type": "string", "pattern": "^([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$" },
           "background.overlayAlpha": { "type": "number", "min": 0, "max": 1 },

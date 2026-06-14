@@ -3,9 +3,9 @@ import { URL } from 'node:url';
 import { loadConfig, publicConfig } from './config.js';
 import { extractToken, isAuthorized } from './auth.js';
 import { sendIpcRequest } from './ipcClient.js';
-import { validateIpcRequest } from './validators.js';
 import { deleteFile, httpError, listFiles, uploadFile } from './fileStore.js';
 import { handleUpgrade } from './websocket.js';
+import { prepareIpcRequest } from './ipcGateway.js';
 
 const config = loadConfig();
 
@@ -37,12 +37,12 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/ipc') {
       const body = await readJson(req);
-      const validation = validateIpcRequest(body, config);
-      if (!validation.ok) {
-        await writeJson(req, res, 400, { ok: false, error: validation.error });
+      const prepared = await prepareIpcRequest(body, config);
+      if (!prepared.ok) {
+        await writeJson(req, res, 400, { ok: false, error: prepared.error });
         return;
       }
-      const response = await sendIpcRequest(validation.request, config);
+      const response = await sendIpcRequest(prepared.request, config);
       await writeJson(req, res, response.ok === false ? 502 : 200, response);
       return;
     }

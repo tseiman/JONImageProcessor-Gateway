@@ -13,7 +13,7 @@ const config = {
           'segmentation.threshold': { type: 'number', min: 0, max: 1 },
           'background.blurStrength': { type: 'integer', min: 1, max: 100 },
           'background.effect': { type: 'string', enum: ['none', 'color', 'blur', 'image'] },
-          'background.image': { type: 'string', pattern: '^[^/\\\\][^\\\\]*$', maxLength: 255 }
+          'background.image': { type: 'string', pattern: '^[A-Za-z0-9._-]+$', maxLength: 120, assetRoot: 'backgrounds' }
         }
       }
     }
@@ -38,5 +38,6 @@ test('rejects out-of-range and unknown IPC writes', () => {
 
 test('rejects invalid string values for media keys', () => {
   assert.equal(validateIpcRequest({ cmd: 'set', key: 'background.image', value: '../secret.jpg' }, config).ok, false);
+  assert.equal(validateIpcRequest({ cmd: 'set', key: 'background.image', value: 'asset/file.jpg' }, config).ok, false);
   assert.equal(validateIpcRequest({ cmd: 'set', key: 'background.effect', value: 'unsupported' }, config).ok, false);
 });

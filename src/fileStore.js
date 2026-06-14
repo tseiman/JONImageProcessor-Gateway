@@ -1,47 +1,104 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
+import os from 'node:os';
+import yauzl from 'yauzl';
+
+const ALLOWED_TYPES = new Set(['Image', 'Video', 'HTML App']);
 
 export async function listFiles(rootName, config) {
   const root = rootConfig(rootName, config);
-  const entries = await fs.promises.readdir(root.path, { withFileTypes: true });
+  const entries = await fs.promises.readdir(root.path, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
   const files = await Promise.all(entries
-    .filter((entry) => entry.isFile())
+    .filter((entry) => entry.isDirectory())
     .map(async (entry) => {
-      const fullPath = path.join(root.path, entry.name);
-      const stat = await fs.promises.stat(fullPath);
-      return { name: entry.name, size: stat.size, mtime: stat.mtime.toISOString() };
+      try {
+        return await readAssetMetadata(rootName, entry.name, config, { publicView: true });
+      } catch {
+        return null;
+      }
     }));
-  return files.sort((a, b) => a.name.localeCompare(b.name));
+  return files.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function uploadFile(req, rootName, fileName, config) {
   const root = rootConfig(rootName, config);
   if (!root.allowUpload) throw httpError(403, 'Uploads are disabled for this root.');
-  const target = resolveTarget(root, fileName);
-  validateExtension(target, root);
+  validateZipName(fileName);
   const contentLength = Number(req.headers['content-length'] ?? 0);
   if (!Number.isFinite(contentLength) || contentLength <= 0) throw httpError(411, 'Content-Length is required.');
   if (contentLength > config.files.maxUploadBytes) throw httpError(413, 'Upload exceeds maxUploadBytes.');
 
-  await fs.promises.mkdir(path.dirname(target), { recursive: true });
+  await fs.promises.mkdir(root.path, { recursive: true });
+  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'jon-gateway-upload-'));
+  const zipPath = path.join(tempDir, 'asset.zip');
+  const extractDir = path.join(tempDir, 'extract');
+
   let received = 0;
   req.on('data', (chunk) => {
     received += chunk.length;
     if (received > config.files.maxUploadBytes) req.destroy(httpError(413, 'Upload exceeds maxUploadBytes.'));
   });
-  await pipeline(req, fs.createWriteStream(target, { flags: 'w' }));
-  const stat = await fs.promises.stat(target);
-  return { name: path.basename(target), size: stat.size, mtime: stat.mtime.toISOString() };
+
+  try {
+    await pipeline(req, fs.createWriteStream(zipPath, { flags: 'w' }));
+    const entries = await extractZip(zipPath, extractDir);
+    const packageDirName = validateZipEntries(entries);
+    const requestedAssetName = path.basename(fileName, '.zip');
+    if (packageDirName !== requestedAssetName) {
+      throw httpError(400, 'ZIP top-level directory must match the uploaded asset name.');
+    }
+
+    const extractedPackageDir = path.join(extractDir, packageDirName);
+    const metadata = await readMetadataFile(path.join(extractedPackageDir, 'info.json'));
+    validateAssetMetadata(metadata);
+    await validateAssetStartFile(metadata.startFile, extractedPackageDir);
+
+    const target = resolvePackageTarget(root, packageDirName);
+    await fs.promises.rm(target, { recursive: true, force: true });
+    await fs.promises.rename(extractedPackageDir, target);
+    return await readAssetMetadata(rootName, packageDirName, config, { publicView: true });
+  } finally {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
-export async function deleteFile(rootName, fileName, config) {
+export async function deleteFile(rootName, assetName, config) {
   const root = rootConfig(rootName, config);
   if (!root.allowDelete) throw httpError(403, 'Deletes are disabled for this root.');
-  const target = resolveTarget(root, fileName);
-  validateExtension(target, root);
-  await fs.promises.unlink(target);
+  const target = resolvePackageTarget(root, assetName);
+  await fs.promises.rm(target, { recursive: true, force: false });
   return { deleted: path.basename(target) };
+}
+
+export async function resolveAssetStartFile(rootName, assetName, config) {
+  const root = rootConfig(rootName, config);
+  const packageDir = resolvePackageTarget(root, assetName);
+  const metadata = await readMetadataFile(path.join(packageDir, 'info.json'));
+  validateAssetMetadata(metadata);
+  await validateAssetStartFile(metadata.startFile, packageDir);
+  return `${assetName}/${metadata.startFile}`;
+}
+
+export async function readAssetMetadata(rootName, assetName, config, options = {}) {
+  const root = rootConfig(rootName, config);
+  const packageDir = resolvePackageTarget(root, assetName);
+  const metadata = await readMetadataFile(path.join(packageDir, 'info.json'));
+  validateAssetMetadata(metadata);
+  const stat = await fs.promises.stat(packageDir);
+  const result = {
+    id: assetName,
+    name: metadata.name,
+    version: metadata.version,
+    description: metadata.description,
+    type: metadata.type,
+    mtime: stat.mtime.toISOString()
+  };
+  if (!options.publicView) result.startFile = metadata.startFile;
+  return result;
 }
 
 function rootConfig(rootName, config) {
@@ -50,23 +107,139 @@ function rootConfig(rootName, config) {
   return root;
 }
 
-function resolveTarget(root, fileName) {
-  if (!fileName || fileName.includes('\0') || path.isAbsolute(fileName) || fileName.includes('..')) {
-    throw httpError(400, 'Invalid file name.');
-  }
+function resolvePackageTarget(root, assetName) {
+  validateAssetName(assetName);
   const base = path.resolve(root.path);
-  const target = path.resolve(base, fileName);
+  const target = path.resolve(base, assetName);
   if (!target.startsWith(`${base}${path.sep}`)) throw httpError(400, 'File path escapes the configured root.');
   return target;
 }
 
-function validateExtension(target, root) {
-  const allowed = root.allowedExtensions ?? [];
-  if (allowed.length === 0) return;
-  const ext = path.extname(target).toLowerCase();
-  if (!allowed.map((item) => item.toLowerCase()).includes(ext)) {
-    throw httpError(415, `File extension is not allowed: ${ext}`);
+function validateZipName(fileName) {
+  if (!fileName || path.extname(fileName).toLowerCase() !== '.zip') {
+    throw httpError(415, 'Only .zip asset packages are allowed.');
   }
+  validateAssetName(path.basename(fileName, '.zip'));
+}
+
+function validateAssetName(assetName) {
+  if (!assetName || !/^[A-Za-z0-9._-]+$/.test(assetName) || assetName === '.' || assetName === '..') {
+    throw httpError(400, 'Invalid asset name.');
+  }
+}
+
+function validateZipEntries(entries) {
+  if (entries.length === 0) throw httpError(400, 'ZIP package is empty.');
+  const topDirs = new Set();
+  for (const entry of entries) {
+    validateZipEntryPath(entry);
+    const [top] = entry.split('/');
+    validateAssetName(top);
+    topDirs.add(top);
+  }
+  if (topDirs.size !== 1) throw httpError(400, 'ZIP package must contain exactly one top-level directory.');
+  const packageDirName = [...topDirs][0];
+  if (!entries.includes(`${packageDirName}/info.json`)) {
+    throw httpError(400, 'ZIP package must contain info.json in its top-level directory.');
+  }
+  return packageDirName;
+}
+
+function validateZipEntryPath(entry) {
+  if (!entry || entry.includes('\0') || entry.startsWith('/') || entry.includes('\\')) {
+    throw httpError(400, 'ZIP package contains an invalid path.');
+  }
+  const normalized = path.posix.normalize(entry);
+  if (normalized.startsWith('../') || normalized === '..' || normalized !== entry) {
+    throw httpError(400, 'ZIP package contains path traversal.');
+  }
+}
+
+async function readMetadataFile(filePath) {
+  let metadata;
+  try {
+    metadata = JSON.parse(await fs.promises.readFile(filePath, 'utf8'));
+  } catch (error) {
+    throw httpError(400, `Invalid or missing info.json: ${error.message}`);
+  }
+  if (metadata.startdatei && !metadata.startFile) metadata.startFile = metadata.startdatei;
+  return metadata;
+}
+
+function validateAssetMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw httpError(400, 'info.json must be a JSON object.');
+  }
+  for (const key of ['name', 'version', 'description', 'type', 'startFile']) {
+    if (typeof metadata[key] !== 'string' || metadata[key].trim() === '') {
+      throw httpError(400, `info.json field must be a non-empty string: ${key}`);
+    }
+  }
+  if (!ALLOWED_TYPES.has(metadata.type)) {
+    throw httpError(400, 'info.json type must be one of: Image, Video, HTML App.');
+  }
+}
+
+async function validateAssetStartFile(relativePath, packageDir) {
+  if (relativePath.includes('\0') || path.isAbsolute(relativePath) || relativePath.includes('\\')) {
+    throw httpError(400, 'info.json startFile must be a relative file path.');
+  }
+  const target = path.resolve(packageDir, relativePath);
+  const base = path.resolve(packageDir);
+  if (!target.startsWith(`${base}${path.sep}`)) {
+    throw httpError(400, 'info.json startFile escapes the package directory.');
+  }
+  const stat = await fs.promises.stat(target).catch(() => null);
+  if (!stat?.isFile()) throw httpError(400, 'info.json startFile does not exist as a file.');
+}
+
+function extractZip(zipPath, extractDir) {
+  return new Promise((resolve, reject) => {
+    const entries = [];
+    yauzl.open(zipPath, { lazyEntries: true, strictFileNames: true }, (openError, zipFile) => {
+      if (openError) {
+        reject(httpError(400, `Invalid ZIP package: ${openError.message}`));
+        return;
+      }
+
+      zipFile.readEntry();
+      zipFile.on('entry', async (entry) => {
+        try {
+          const fileName = entry.fileName.replace(/\/$/, '');
+          if (fileName) entries.push(fileName);
+          if (fileName) validateZipEntryPath(fileName);
+
+          if (entry.fileName.endsWith('/')) {
+            await fs.promises.mkdir(path.join(extractDir, entry.fileName), { recursive: true });
+            zipFile.readEntry();
+            return;
+          }
+
+          const target = path.resolve(extractDir, entry.fileName);
+          const base = path.resolve(extractDir);
+          if (!target.startsWith(`${base}${path.sep}`)) throw httpError(400, 'ZIP package contains path traversal.');
+          await fs.promises.mkdir(path.dirname(target), { recursive: true });
+
+          zipFile.openReadStream(entry, async (streamError, readStream) => {
+            if (streamError) {
+              reject(httpError(400, `Invalid ZIP entry: ${streamError.message}`));
+              return;
+            }
+            try {
+              await pipeline(readStream, fs.createWriteStream(target, { flags: 'w' }));
+              zipFile.readEntry();
+            } catch (writeError) {
+              reject(writeError);
+            }
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+      zipFile.on('end', () => resolve(entries));
+      zipFile.on('error', (error) => reject(httpError(400, `Invalid ZIP package: ${error.message}`)));
+    });
+  });
 }
 
 export function httpError(status, message) {

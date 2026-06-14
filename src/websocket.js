@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { extractToken, isAuthorized } from './auth.js';
-import { sendIpcRequest } from './ipcClient.js';
-import { validateIpcRequest } from './validators.js';
+import { handleIpcRequest } from './ipcGateway.js';
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
@@ -38,12 +37,7 @@ export function handleUpgrade(req, socket, head, config) {
   connection.onMessage = async (message) => {
     try {
       const body = JSON.parse(message);
-      const validation = validateIpcRequest(body, config);
-      if (!validation.ok) {
-        connection.sendJson({ ok: false, error: validation.error });
-        return;
-      }
-      const response = await sendIpcRequest(validation.request, config);
+      const response = await handleIpcRequest(body, config);
       connection.sendJson(response);
     } catch (error) {
       connection.sendJson({ ok: false, error: error.message });
