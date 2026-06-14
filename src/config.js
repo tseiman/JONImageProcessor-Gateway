@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_CONFIG_PATHS = [
-  '/etc/jonimageprocessor-gateway/config.json',
+  '/opt/JONImageProcessor-Gateway/etc/gateway.config.json',
   path.resolve(process.cwd(), 'config/gateway.config.json'),
   path.resolve(process.cwd(), 'config/gateway.config.example.json')
 ];
@@ -11,7 +11,7 @@ const DEFAULT_CONFIG_PATHS = [
 export function loadConfig() {
   const configPath = process.env.JON_GATEWAY_CONFIG || DEFAULT_CONFIG_PATHS.find((candidate) => fs.existsSync(candidate));
   if (!configPath) {
-    throw new Error('No gateway config found. Set JON_GATEWAY_CONFIG or create config/gateway.config.json.');
+    throw new Error('No gateway config found. Set JON_GATEWAY_CONFIG or create /opt/JONImageProcessor-Gateway/etc/gateway.config.json.');
   }
 
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));

@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "description": "HTTP JSON and WebSocket gateway for JONImageProcessor",
   "type": "module",
-  "main": "src/server.js",
+  "main": "bin/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "check": "node --check src/*.js",
+    "start": "node bin/server.js",
+    "check": "node --check bin/*.js src/*.js",
     "test": "node --test"
   },
   "engines": {

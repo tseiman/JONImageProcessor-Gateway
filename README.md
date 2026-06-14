@@ -13,12 +13,20 @@ Node.js gateway for the local `JONImageProcessor` runtime IPC API. The gateway e
 
 ## Configuration
 
+Default deployment layout:
+
+```bash
+/opt/JONImageProcessor-Gateway/bin/server.js
+/opt/JONImageProcessor-Gateway/etc/gateway.config.json
+/opt/JONImageProcessor-Gateway/etc/token.env
+```
+
 Copy the example config and edit paths for the target system:
 
 ```bash
-sudo mkdir -p /etc/jonimageprocessor-gateway
-sudo cp config/gateway.config.example.json /etc/jonimageprocessor-gateway/config.json
-sudo nano /etc/jonimageprocessor-gateway/config.json
+sudo mkdir -p /opt/JONImageProcessor-Gateway/etc
+sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
+sudo nano /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 ```
 
 The important settings are:
@@ -50,9 +58,9 @@ Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is acce
 The gateway requires a token at startup. The easiest setup is an environment file:
 
 ```bash
-sudo install -m 700 -d /etc/jonimageprocessor-gateway
-printf 'JON_GATEWAY_TOKEN=%s\n' "$(openssl rand -base64 32)" | sudo tee /etc/jonimageprocessor-gateway/token.env >/dev/null
-sudo chmod 600 /etc/jonimageprocessor-gateway/token.env
+sudo install -m 700 -d /opt/JONImageProcessor-Gateway/etc
+printf 'JON_GATEWAY_TOKEN=%s\n' "$(openssl rand -base64 32)" | sudo tee /opt/JONImageProcessor-Gateway/etc/token.env >/dev/null
+sudo chmod 600 /opt/JONImageProcessor-Gateway/etc/token.env
 ```
 
 Clients send the token as:
@@ -72,13 +80,13 @@ For deployments where the token should not be stored as plaintext in an environm
 ## Run Locally
 
 ```bash
-JON_GATEWAY_TOKEN=dev-token node src/server.js
+JON_GATEWAY_TOKEN=dev-token node bin/server.js
 ```
 
 Use a different config path when needed:
 
 ```bash
-JON_GATEWAY_CONFIG=/etc/jonimageprocessor-gateway/config.json JON_GATEWAY_TOKEN=dev-token node src/server.js
+JON_GATEWAY_CONFIG=/opt/JONImageProcessor-Gateway/etc/gateway.config.json JON_GATEWAY_TOKEN=dev-token node bin/server.js
 ```
 
 Syntax check:
@@ -163,13 +171,48 @@ Responses are the JSON responses from `JONImageProcessor`, or a gateway validati
 
 ## systemd
 
-Install the application under `/opt/JONImageProcessor-Gateway`, configure `/etc/jonimageprocessor-gateway/config.json`, and create `/etc/jonimageprocessor-gateway/token.env` as shown above.
+Install the application under `/opt/JONImageProcessor-Gateway`, configure `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`, and create `/opt/JONImageProcessor-Gateway/etc/token.env` as shown above.
 
 Install dependencies from the project directory:
 
 ```bash
 npm install --omit=dev
 ```
+
+The systemd unit expects this layout:
+
+```bash
+sudo mkdir -p /opt/JONImageProcessor-Gateway/bin /opt/JONImageProcessor-Gateway/etc
+sudo cp -r bin src package.json package-lock.json node_modules /opt/JONImageProcessor-Gateway/
+sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
+```
+
+Example systemd unit:
+
+```ini
+[Unit]
+Description=JONImageProcessor Gateway
+After=local-fs.target network-online.target jon-image-processor.service
+Wants=network-online.target
+Requires=jon-image-processor.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/JONImageProcessor-Gateway
+Environment=JON_GATEWAY_CONFIG=/opt/JONImageProcessor-Gateway/etc/gateway.config.json
+EnvironmentFile=-/opt/JONImageProcessor-Gateway/etc/token.env
+ExecStart=/usr/bin/node /opt/JONImageProcessor-Gateway/bin/server.js
+Restart=always
+RestartSec=2
+User=jonimageprocessor
+Group=jonimageprocessor
+SupplementaryGroups=video input render debug
+
+[Install]
+WantedBy=jon.target
+```
+
+The committed unit file is [packaging/systemd/jonimageprocessor-gateway.service](/home/tseiman/agent-work/JONImageProcessor-Gateway/packaging/systemd/jonimageprocessor-gateway.service).
 
 Copy and enable the unit:
 

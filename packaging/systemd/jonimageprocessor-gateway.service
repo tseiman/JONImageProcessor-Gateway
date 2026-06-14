@@ -1,18 +1,20 @@
 [Unit]
 Description=JONImageProcessor Gateway
-After=network-online.target jon-image-processor.service
+After=local-fs.target network-online.target jon-image-processor.service
 Wants=network-online.target
+Requires=jon-image-processor.service
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/JONImageProcessor-Gateway
-Environment=JON_GATEWAY_CONFIG=/etc/jonimageprocessor-gateway/config.json
-EnvironmentFile=-/etc/jonimageprocessor-gateway/token.env
-ExecStart=/usr/bin/node /opt/JONImageProcessor-Gateway/src/server.js
-Restart=on-failure
-RestartSec=5
+Environment=JON_GATEWAY_CONFIG=/opt/JONImageProcessor-Gateway/etc/gateway.config.json
+EnvironmentFile=-/opt/JONImageProcessor-Gateway/etc/token.env
+ExecStart=/usr/bin/node /opt/JONImageProcessor-Gateway/bin/server.js
+Restart=always
+RestartSec=2
 User=jonimageprocessor
 Group=jonimageprocessor
+SupplementaryGroups=video input render debug
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=jon.target
