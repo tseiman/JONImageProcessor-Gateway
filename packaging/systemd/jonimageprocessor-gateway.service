@@ -1,0 +1,18 @@
+[Unit]
+Description=JONImageProcessor Gateway
+After=network-online.target jon-image-processor.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/JONImageProcessor-Gateway
+Environment=JON_GATEWAY_CONFIG=/etc/jonimageprocessor-gateway/config.json
+EnvironmentFile=-/etc/jonimageprocessor-gateway/token.env
+ExecStart=/usr/bin/node /opt/JONImageProcessor-Gateway/src/server.js
+Restart=on-failure
+RestartSec=5
+User=jonimageprocessor
+Group=jonimageprocessor
+
+[Install]
+WantedBy=multi-user.target
