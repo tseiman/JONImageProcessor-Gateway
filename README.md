@@ -11,21 +11,49 @@ Node.js gateway for the local `JONImageProcessor` runtime IPC API. The gateway e
 - The gateway user must have read/write access to the configured media folders and access to the Unix socket.
 - npm project dependencies installed with `npm install`.
 
-## Configuration
+## Install
 
 Default deployment layout:
 
 ```bash
 /opt/JONImageProcessor-Gateway/bin/server.js
+/opt/JONImageProcessor-Gateway/src/
+/opt/JONImageProcessor-Gateway/node_modules/
 /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 /opt/JONImageProcessor-Gateway/etc/token.env
 ```
 
+Install the application from a checkout on the target machine:
+
+```bash
+npm install --omit=dev
+sudo install -d -m 755 /opt/JONImageProcessor-Gateway
+sudo install -d -m 755 /opt/JONImageProcessor-Gateway/bin
+sudo install -d -m 755 /opt/JONImageProcessor-Gateway/src
+sudo install -d -m 700 /opt/JONImageProcessor-Gateway/etc
+sudo cp -a bin/. /opt/JONImageProcessor-Gateway/bin/
+sudo cp -a src/. /opt/JONImageProcessor-Gateway/src/
+sudo cp -a node_modules package.json package-lock.json /opt/JONImageProcessor-Gateway/
+sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
+```
+
+The files copied to `/opt/JONImageProcessor-Gateway/bin` and `/opt/JONImageProcessor-Gateway/src` are the gateway code. `node_modules`, `package.json`, and `package-lock.json` are copied so the installed service has the npm dependencies it needs at runtime.
+
+Install the example systemd unit:
+
+```bash
+sudo cp packaging/systemd/jonimageprocessor-gateway.service /etc/systemd/system/jonimageprocessor-gateway.service
+sudo systemctl daemon-reload
+sudo systemctl enable jonimageprocessor-gateway.service
+```
+
+Do not start the service until `/opt/JONImageProcessor-Gateway/etc/gateway.config.json` and `/opt/JONImageProcessor-Gateway/etc/token.env` have been configured.
+
+## Configuration
+
 Copy the example config and edit paths for the target system:
 
 ```bash
-sudo mkdir -p /opt/JONImageProcessor-Gateway/etc
-sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 sudo nano /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 ```
 
@@ -173,20 +201,6 @@ Responses are the JSON responses from `JONImageProcessor`, or a gateway validati
 
 Install the application under `/opt/JONImageProcessor-Gateway`, configure `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`, and create `/opt/JONImageProcessor-Gateway/etc/token.env` as shown above.
 
-Install dependencies from the project directory:
-
-```bash
-npm install --omit=dev
-```
-
-The systemd unit expects this layout:
-
-```bash
-sudo mkdir -p /opt/JONImageProcessor-Gateway/bin /opt/JONImageProcessor-Gateway/etc
-sudo cp -r bin src package.json package-lock.json node_modules /opt/JONImageProcessor-Gateway/
-sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
-```
-
 Example systemd unit:
 
 ```ini
@@ -212,14 +226,9 @@ SupplementaryGroups=video input render debug
 WantedBy=jon.target
 ```
 
-The committed unit file is [packaging/systemd/jonimageprocessor-gateway.service](/home/tseiman/agent-work/JONImageProcessor-Gateway/packaging/systemd/jonimageprocessor-gateway.service).
-
-Copy and enable the unit:
+Start or restart the service:
 
 ```bash
-sudo cp packaging/systemd/jonimageprocessor-gateway.service /etc/systemd/system/jonimageprocessor-gateway.service
-sudo systemctl daemon-reload
-sudo systemctl enable jonimageprocessor-gateway.service
 sudo systemctl start jonimageprocessor-gateway.service
 ```
 
