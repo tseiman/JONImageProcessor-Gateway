@@ -159,8 +159,11 @@ async function loadAssets() {
 
 function flattenValues(source, prefix = '', out = {}) {
   if (!source || typeof source !== 'object') return out;
+  if (!prefix && source.values && typeof source.values === 'object' && !Array.isArray(source.values)) {
+    return flattenValues(source.values, '', out);
+  }
   for (const [key, value] of Object.entries(source)) {
-    if (key === 'ok') continue;
+    if (key === 'ok' || key === 'key') continue;
     const nextKey = prefix ? `${prefix}.${key}` : key;
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       flattenValues(value, nextKey, out);
@@ -620,8 +623,9 @@ async function refresh(showOk = true) {
   try {
     if (!state.schema) await loadSchema();
     await loadAssets();
-    await loadValues();
-    render();
+    const changedKeys = await loadValues();
+    if (!state.rendered) render();
+    else patchControls(changedKeys);
     connectWebSocket();
     setConnected(true);
     if (showOk) showMessage('State refreshed');
