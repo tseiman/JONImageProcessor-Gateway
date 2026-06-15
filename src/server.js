@@ -1,4 +1,6 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import { URL } from 'node:url';
 import { loadConfig, publicConfig } from './config.js';
 import { extractToken, isAuthorized } from './auth.js';
@@ -9,6 +11,7 @@ import { prepareIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
 
 const config = loadConfig();
+const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
 let nextRequestId = 1;
 
 const server = http.createServer(async (req, res) => {
@@ -37,6 +40,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/health') {
       await writeJson(req, res, 200, { ok: true, service: 'jonimageprocessor-gateway' });
       return;
+    }
+
+    if (req.method === 'GET' && !url.pathname.startsWith('/api/')) {
+      const served = await serveStatic(url.pathname, res);
+      if (served) return;
     }
 
     const token = extractToken(req, config, url);
@@ -198,4 +206,37 @@ function requestLogFields(req, url, requestId) {
     userAgent: req.headers['user-agent'],
     contentLength: req.headers['content-length']
   };
+}
+
+async function serveStatic(requestPath, res) {
+  const pathname = requestPath === '/' ? '/index.html' : requestPath;
+  const decoded = decodeURIComponent(pathname);
+  if (decoded.includes('\0')) throw httpError(400, 'Invalid static path.');
+  const target = path.resolve(PUBLIC_DIR, `.${decoded}`);
+  if (!target.startsWith(`${PUBLIC_DIR}${path.sep}`)) throw httpError(400, 'Invalid static path.');
+
+  const stat = await fs.promises.stat(target).catch(() => null);
+  if (!stat?.isFile()) return false;
+
+  const body = await fs.promises.readFile(target);
+  res.writeHead(200, {
+    'content-type': contentType(target),
+    'content-length': body.length,
+    'cache-control': target.endsWith('index.html') ? 'no-store' : 'public, max-age=3600'
+  });
+  res.end(body);
+  return true;
+}
+
+function contentType(filePath) {
+  switch (path.extname(filePath).toLowerCase()) {
+    case '.html': return 'text/html; charset=utf-8';
+    case '.css': return 'text/css; charset=utf-8';
+    case '.js': return 'text/javascript; charset=utf-8';
+    case '.svg': return 'image/svg+xml';
+    case '.png': return 'image/png';
+    case '.jpg':
+    case '.jpeg': return 'image/jpeg';
+    default: return 'application/octet-stream';
+  }
 }

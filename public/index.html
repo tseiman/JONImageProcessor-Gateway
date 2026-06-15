@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JONImageProcessor Control</title>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <img src="/img/logo.svg" alt="">
+      <div>
+        <b>JONImageProcessor</b>
+        <span>Gateway Control</span>
+      </div>
+    </div>
+    <div class="status">
+      <b id="connectionStatus">Disconnected</b>
+      <span id="fpsStatus">FPS --</span>
+      <span id="latencyStatus">Latency --</span>
+      <span id="ipcStatus">IPC idle</span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h3>PRESETS</h3>
+        <button id="settingsButton" class="icon-button" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+      <button class="preset-button" disabled>Default</button>
+      <button class="preset-button" disabled>Green Screen</button>
+      <button class="preset-button" disabled>Blur Background</button>
+      <button class="preset-button" disabled>Office</button>
+      <hr>
+      <button class="action" disabled>Save Preset</button>
+      <button id="refreshButton" class="action">Refresh</button>
+    </aside>
+
+    <main>
+      <div class="preview">
+        <div>
+          <strong>LIVE PREVIEW</strong>
+          <span>Preview stream will be added later</span>
+        </div>
+      </div>
+
+      <div id="message" class="message" hidden></div>
+      <div id="stages" class="stages"></div>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog">
+      <div class="dialog-head">
+        <h2>Settings</h2>
+        <button value="close" class="icon-button" aria-label="Close">×</button>
+      </div>
+      <label class="field">
+        <span>API Token</span>
+        <input id="tokenInput" type="password" autocomplete="current-password">
+      </label>
+      <label class="checkbox">
+        <input id="showTokenInput" type="checkbox">
+        <span>Show token</span>
+      </label>
+      <div class="dialog-actions">
+        <button id="clearTokenButton" value="clear" class="secondary">Clear</button>
+        <button id="saveTokenButton" value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/js/app.js" type="module"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ Default deployment layout:
 ```bash
 /opt/JONImageProcessor-Gateway/bin/server.js
 /opt/JONImageProcessor-Gateway/src/
+/opt/JONImageProcessor-Gateway/public/
 /opt/JONImageProcessor-Gateway/node_modules/
 /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 /opt/JONImageProcessor-Gateway/etc/token.env
@@ -30,14 +31,16 @@ npm install --omit=dev
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway/bin
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway/src
+sudo install -d -m 755 /opt/JONImageProcessor-Gateway/public
 sudo install -d -m 700 /opt/JONImageProcessor-Gateway/etc
 sudo cp -a bin/. /opt/JONImageProcessor-Gateway/bin/
 sudo cp -a src/. /opt/JONImageProcessor-Gateway/src/
+sudo cp -a public/. /opt/JONImageProcessor-Gateway/public/
 sudo cp -a node_modules package.json package-lock.json /opt/JONImageProcessor-Gateway/
 sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/gateway.config.json
 ```
 
-The files copied to `/opt/JONImageProcessor-Gateway/bin` and `/opt/JONImageProcessor-Gateway/src` are the gateway code. `node_modules`, `package.json`, and `package-lock.json` are copied so the installed service has the npm dependencies it needs at runtime.
+The files copied to `/opt/JONImageProcessor-Gateway/bin` and `/opt/JONImageProcessor-Gateway/src` are the gateway code. `public` contains the WebUI served by the same Node.js process. `node_modules`, `package.json`, and `package-lock.json` are copied so the installed service has the npm dependencies it needs at runtime.
 
 Install the example systemd unit:
 
@@ -127,6 +130,14 @@ npm run check
 ```
 
 ## HTTP API
+
+The WebUI is served by the gateway at:
+
+```text
+http://127.0.0.1:8080/
+```
+
+The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
 
 Health is intentionally unauthenticated:
 
