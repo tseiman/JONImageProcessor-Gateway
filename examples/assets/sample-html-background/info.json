@@ -1,0 +1,7 @@
+{
+  "name": "Sample HTML Background",
+  "version": "1.0.0",
+  "description": "Example HTML asset package for background.",
+  "type": "HTML",
+  "startFile": "index.html"
+}

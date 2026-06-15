@@ -1,0 +1,7 @@
+{
+  "name": "Sample HTML Pause",
+  "version": "1.0.0",
+  "description": "Example HTML asset package for pause.",
+  "type": "HTML",
+  "startFile": "index.html"
+}
