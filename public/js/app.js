@@ -164,10 +164,24 @@ async function loadValues() {
 
 async function loadAssets() {
   const roots = Object.keys(state.schema?.files?.roots || {});
+  const changedRoots = [];
   await Promise.all(roots.map(async (root) => {
     const data = await apiFetch(`/api/files/${encodeURIComponent(root)}`);
-    state.assets[root] = data.files || [];
+    const nextFiles = data.files || [];
+    if (assetListSignature(state.assets[root]) !== assetListSignature(nextFiles)) changedRoots.push(root);
+    state.assets[root] = nextFiles;
   }));
+  return changedRoots;
+}
+
+function assetListSignature(files = []) {
+  return JSON.stringify(files.map((file) => ({
+    id: file.id,
+    name: file.name,
+    type: file.type,
+    description: file.description,
+    version: file.version
+  })));
 }
 
 function flattenValues(source, prefix = '', out = {}) {
@@ -1114,6 +1128,18 @@ function updateAssetControl(control, key) {
   updateAssetDetail(control, rule?.assetRoot, selectedAsset);
 }
 
+function refreshAssetControls(roots) {
+  if (!roots?.length || !state.rendered) return;
+  const rootSet = new Set(roots);
+  const items = state.schema?.api?.commands?.set?.items || {};
+  for (const [key, rule] of Object.entries(items)) {
+    if (!rule.assetRoot || !rootSet.has(rule.assetRoot)) continue;
+    const control = document.querySelector(`.control[data-key="${cssEscape(key)}"]`);
+    if (!control) continue;
+    control.replaceWith(renderControl(key, rule));
+  }
+}
+
 function buildAssetPicker(control, root, selectedAsset, onSelect) {
   const picker = document.createElement('div');
   picker.className = 'asset-picker';
@@ -1291,10 +1317,13 @@ async function refresh(showOk = true) {
   }
   try {
     if (!state.schema) await loadSchema();
-    await loadAssets();
+    const changedAssetRoots = await loadAssets();
     const changedKeys = await loadValues();
     if (!state.rendered) render();
-    else patchControls(changedKeys);
+    else {
+      refreshAssetControls(changedAssetRoots);
+      patchControls(changedKeys);
+    }
     connectWebSocket();
     setConnected(true);
     if (showOk) showMessage('State refreshed');
