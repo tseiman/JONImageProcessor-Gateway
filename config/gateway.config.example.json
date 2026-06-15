@@ -73,7 +73,16 @@
           "pause.loopIfVideo": { "type": "boolean" },
           "pause.showStatusText": { "type": "boolean" },
           "pause.textColor": { "type": "string", "pattern": "^[0-9a-fA-F]{8}$" },
-          "pause.textPosition": { "type": "string", "pattern": "^(auto|[0-9]+x[0-9]+)$" },
+          "pause.textPosition": {
+            "type": "string",
+            "pattern": "^(auto|[0-9]+x[0-9]+)$",
+            "ui": {
+              "position": {
+                "x": { "min": 0, "max": 1920, "step": 10 },
+                "y": { "min": 0, "max": 1080, "step": 10 }
+              }
+            }
+          },
           "pause.textSize": { "type": "number", "min": 0.1, "max": 10.0 },
           "pause.font": { "type": "string", "enum": ["plain", "simplex", "duplex", "complex", "triplex", "complex-small", "script-simplex", "script-complex"] },
           "segmentation.threshold": { "type": "number", "min": 0, "max": 1 },

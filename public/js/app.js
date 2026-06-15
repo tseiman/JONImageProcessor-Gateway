@@ -65,7 +65,7 @@ const STAGES = [
   },
   {
     title: 'PAUSE',
-    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font']
+    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.textPosition', 'pause.font']
   }
 ];
 
@@ -88,6 +88,7 @@ const LABELS = {
   'pause.showStatusText': 'Status Text',
   'pause.textColor': 'Text Color',
   'pause.textSize': 'Text Size',
+  'pause.textPosition': 'Text Position',
   'pause.font': 'Font'
 };
 
@@ -609,6 +610,7 @@ function renderControl(key, rule) {
   if (rule.enum) return renderEnumControl(key, rule);
   if (rule.type === 'number' || rule.type === 'integer') return renderNumberControl(key, rule);
   if (key === 'background.overlayColor') return renderRgbControl(key);
+  if (key === 'pause.textPosition') return renderPositionControl(key, rule);
   return renderTextControl(key, rule);
 }
 
@@ -656,6 +658,7 @@ function patchControls(keys) {
     else if (kind === 'select-enum') updateSelectEnumControl(control, key);
     else if (kind === 'number') updateNumberControl(control, key);
     else if (kind === 'rgb') updateRgbControl(control, key);
+    else if (kind === 'position') updatePositionControl(control, key);
     else if (kind === 'asset') updateAssetControl(control, key);
     else if (kind === 'text') updateTextControl(control, key);
   }
@@ -817,6 +820,82 @@ function updateRgbControl(control, key) {
   });
   const preview = control.querySelector('.color-preview');
   if (preview) preview.style.background = `rgb(${value.map((part) => Number.isFinite(part) ? part : 0).join(',')})`;
+}
+
+function renderPositionControl(key, rule) {
+  const limits = positionLimits(rule);
+  const value = parsePositionValue(state.values[key]);
+  const control = controlShell(key, `${limits.x.min} bis ${limits.x.max}, ${limits.y.min} bis ${limits.y.max}`);
+  control.dataset.kind = 'position';
+  const wrap = document.createElement('div');
+  wrap.className = 'position-knobs';
+  const inputs = [
+    { axis: 'x', label: 'X', limits: limits.x, value: value.x },
+    { axis: 'y', label: 'Y', limits: limits.y, value: value.y }
+  ].map((channel) => {
+    const item = document.createElement('div');
+    item.className = 'position-knob';
+    item.dataset.axis = channel.axis;
+    const label = document.createElement('label');
+    label.textContent = channel.label;
+    const knob = document.createElement('div');
+    knob.className = 'knob small';
+    knob.dataset.min = channel.limits.min;
+    knob.dataset.max = channel.limits.max;
+    knob.dataset.step = channel.limits.step;
+    knob.dataset.value = Number.isFinite(channel.value) ? channel.value : channel.limits.min;
+    const input = document.createElement('input');
+    input.className = 'knob-value';
+    input.type = 'number';
+    input.min = channel.limits.min;
+    input.max = channel.limits.max;
+    input.step = channel.limits.step;
+    input.value = Number.isFinite(channel.value) ? channel.value : channel.limits.min;
+    function commitPosition(nextValue) {
+      if (Number.isFinite(nextValue)) input.value = clamp(nextValue, channel.limits.min, channel.limits.max);
+      const next = inputs.map((item) => Math.round(clamp(Number(item.value), Number(item.min), Number(item.max))));
+      setValue(key, `${next[0]}x${next[1]}`);
+    }
+    item.append(label, knob, input);
+    wrap.appendChild(item);
+    buildKnob(knob, commitPosition);
+    return input;
+  });
+  control.appendChild(wrap);
+  return control;
+}
+
+function updatePositionControl(control, key) {
+  const value = parsePositionValue(state.values[key]);
+  control.querySelectorAll('.position-knob').forEach((item) => {
+    const axis = item.dataset.axis;
+    const input = item.querySelector('input');
+    const knob = item.querySelector('.knob');
+    const fallback = Number(input?.min || 0);
+    const nextValue = Number.isFinite(value[axis]) ? value[axis] : fallback;
+    if (knob?.setDisplayValue) knob.setDisplayValue(nextValue);
+    if (input && document.activeElement !== input) input.value = Math.round(nextValue);
+  });
+}
+
+function parsePositionValue(value) {
+  const match = String(value || '').match(/^(\d+)x(\d+)$/);
+  return match ? { x: Number(match[1]), y: Number(match[2]) } : { x: 0, y: 0 };
+}
+
+function positionLimits(rule) {
+  return {
+    x: {
+      min: Number(rule.ui?.position?.x?.min ?? 0),
+      max: Number(rule.ui?.position?.x?.max ?? 1920),
+      step: Number(rule.ui?.position?.x?.step ?? 10)
+    },
+    y: {
+      min: Number(rule.ui?.position?.y?.min ?? 0),
+      max: Number(rule.ui?.position?.y?.max ?? 1080),
+      step: Number(rule.ui?.position?.y?.step ?? 10)
+    }
+  };
 }
 
 function renderTextControl(key) {

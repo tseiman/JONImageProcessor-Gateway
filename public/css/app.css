@@ -378,6 +378,30 @@ select:focus,
   padding: 5px;
 }
 
+.position-knobs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.position-knob {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+.position-knob label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.position-knob .knob-value {
+  width: 72px;
+  padding: 5px;
+}
+
 .color-preview {
   height: 28px;
   border-radius: 7px;
