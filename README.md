@@ -1,3 +1,5 @@
+<img src="public/img/logo.svg" align="right" width="72" height="72" alt="JIP logo">
+
 # JONImageProcessor-Gateway
 
 Node.js gateway for the local `JONImageProcessor` runtime IPC API. The gateway exposes an authenticated HTTP JSON API, a WebSocket API, and file-management endpoints for media folders that are needed by the remote UI.
