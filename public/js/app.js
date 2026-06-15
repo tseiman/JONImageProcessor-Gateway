@@ -598,6 +598,7 @@ function renderControl(key, rule) {
   if (rule.enum) return renderEnumControl(key, rule);
   if (rule.type === 'number' || rule.type === 'integer') return renderNumberControl(key, rule);
   if (key === 'background.overlayColor') return renderRgbControl(key);
+  if (key === 'pause.textColor') return renderRgbaControl(key);
   if (key === 'pause.textPosition') return renderPositionControl(key, rule);
   return renderTextControl(key, rule);
 }
@@ -646,6 +647,7 @@ function patchControls(keys) {
     else if (kind === 'select-enum') updateSelectEnumControl(control, key);
     else if (kind === 'number') updateNumberControl(control, key);
     else if (kind === 'rgb') updateRgbControl(control, key);
+    else if (kind === 'rgba') updateRgbaControl(control, key);
     else if (kind === 'position') updatePositionControl(control, key);
     else if (kind === 'asset') updateAssetControl(control, key);
     else if (kind === 'text') updateTextControl(control, key);
@@ -808,6 +810,83 @@ function updateRgbControl(control, key) {
   });
   const preview = control.querySelector('.color-preview');
   if (preview) preview.style.background = `rgb(${value.map((part) => Number.isFinite(part) ? part : 0).join(',')})`;
+}
+
+function renderRgbaControl(key) {
+  const value = parseRgbaHex(state.values[key]);
+  const control = controlShell(key, '0 bis 255');
+  control.dataset.kind = 'rgba';
+  const rgba = document.createElement('div');
+  rgba.className = 'rgba';
+  const preview = document.createElement('div');
+  preview.className = 'color-preview alpha-preview';
+  const channels = [
+    { label: 'R', color: '#ff4b4b' },
+    { label: 'G', color: '#38d878' },
+    { label: 'B', color: '#4da3ff' },
+    { label: 'A', color: '#f2f5f8' }
+  ];
+  const inputs = channels.map((channel, index) => {
+    const item = document.createElement('div');
+    item.className = 'rgba-knob';
+    const label = document.createElement('label');
+    label.textContent = channel.label;
+    const knob = document.createElement('div');
+    knob.className = 'knob tiny';
+    knob.style.setProperty('--knob-accent', channel.color);
+    knob.dataset.min = 0;
+    knob.dataset.max = 255;
+    knob.dataset.step = 1;
+    knob.dataset.value = value[index];
+    const input = document.createElement('input');
+    input.className = 'knob-value';
+    input.type = 'number';
+    input.min = 0;
+    input.max = 255;
+    input.step = 1;
+    input.value = value[index];
+    function commitRgba(nextValue) {
+      if (Number.isFinite(nextValue)) input.value = clamp(nextValue, 0, 255);
+      const next = inputs.map((item) => Math.round(clamp(Number(item.value), 0, 255)));
+      updateRgbaPreview(preview, next);
+      setValue(key, rgbaToHex(next));
+    }
+    input.addEventListener('change', commitRgba);
+    item.append(label, knob, input);
+    rgba.appendChild(item);
+    buildKnob(knob, commitRgba);
+    return input;
+  });
+  updateRgbaPreview(preview, value);
+  control.append(rgba, preview);
+  return control;
+}
+
+function updateRgbaControl(control, key) {
+  const value = parseRgbaHex(state.values[key]);
+  control.querySelectorAll('.rgba-knob').forEach((item, index) => {
+    const input = item.querySelector('input');
+    const knob = item.querySelector('.knob');
+    if (knob?.setDisplayValue) knob.setDisplayValue(value[index]);
+    if (input && document.activeElement !== input) input.value = value[index];
+  });
+  const preview = control.querySelector('.color-preview');
+  if (preview) updateRgbaPreview(preview, value);
+}
+
+function parseRgbaHex(value) {
+  const text = String(value || '').trim();
+  const hex = /^[0-9a-fA-F]{8}$/.test(text) ? text : 'ffffffff';
+  return [0, 2, 4, 6].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+}
+
+function rgbaToHex(values) {
+  return values.map((value) => Math.round(clamp(Number(value), 0, 255)).toString(16).padStart(2, '0')).join('');
+}
+
+function updateRgbaPreview(preview, values) {
+  const [r, g, b, a] = values.map((value) => Math.round(clamp(Number(value), 0, 255)));
+  preview.style.setProperty('--preview-color', `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`);
 }
 
 function renderPositionControl(key, rule) {

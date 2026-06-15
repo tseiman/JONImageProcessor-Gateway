@@ -320,6 +320,11 @@ button:disabled {
   height: 82px;
 }
 
+.knob.tiny {
+  width: 60px;
+  height: 60px;
+}
+
 .knob-bg { fill: #141922; stroke: #4a5362; stroke-width: 2; }
 .knob-inner { fill: #252d39; stroke: #101318; stroke-width: 2; }
 .knob-range { fill: none; stroke: #3d4654; stroke-width: 8; stroke-linecap: round; }
@@ -394,6 +399,30 @@ select:focus,
   padding: 5px;
 }
 
+.rgba {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.rgba-knob {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+.rgba-knob label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.rgba-knob .knob-value {
+  width: 52px;
+  padding: 5px 3px;
+}
+
 .position-knobs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -424,6 +453,18 @@ select:focus,
   background: rgb(0, 255, 0);
   border: 1px solid var(--border);
   margin-top: 8px;
+}
+
+.alpha-preview {
+  background:
+    linear-gradient(var(--preview-color), var(--preview-color)),
+    linear-gradient(45deg, #303846 25%, transparent 25%),
+    linear-gradient(-45deg, #303846 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #303846 75%),
+    linear-gradient(-45deg, transparent 75%, #303846 75%),
+    #0d1015;
+  background-position: 0 0, 0 0, 0 5px, 5px -5px, -5px 0;
+  background-size: auto, 10px 10px, 10px 10px, 10px 10px, 10px 10px;
 }
 
 .asset-row {
