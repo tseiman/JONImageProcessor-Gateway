@@ -8,6 +8,8 @@ const state = {
   confirmTimeoutMs: readConfirmTimeout(),
   schema: null,
   values: {},
+  fpsHistory: [],
+  lastFpsPaintMs: 0,
   presets: readPresets(),
   assets: { backgrounds: [], pause: [] },
   pending: {},
@@ -186,12 +188,89 @@ function flattenValues(source, prefix = '', out = {}) {
 }
 
 function updateBenchmark(benchmark) {
-  if (!benchmark || typeof benchmark !== 'object') {
-    elements.fpsStatus.textContent = 'FPS --';
+  const fps = readFpsValue(benchmark);
+  const label = elements.fpsStatus.querySelector('.fps-label');
+  const polyline = elements.fpsStatus.querySelector('polyline');
+  if (!Number.isFinite(fps)) {
+    if (label) label.textContent = 'FPS --';
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
     return;
   }
-  const fps = benchmark.fps || benchmark.framesPerSecond || benchmark.averageFps;
-  elements.fpsStatus.textContent = fps ? `FPS ${Number(fps).toFixed(1)}` : 'FPS --';
+
+  const now = performance.now();
+  if (state.fpsHistory.length > 0 && now - state.lastFpsPaintMs < 900) return;
+  state.lastFpsPaintMs = now;
+  state.fpsHistory.push(fps);
+  if (state.fpsHistory.length > 32) state.fpsHistory.shift();
+  if (label) label.textContent = `FPS ${fps.toFixed(1)}`;
+  if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
+}
+
+function readFpsValue(benchmark) {
+  if (benchmark && typeof benchmark === 'object') {
+    const fps = firstFiniteNumber(
+      benchmark.fps,
+      benchmark.framesPerSecond,
+      benchmark.averageFps,
+      benchmark.currentFps,
+      benchmark.avgFps,
+      benchmark.processingFps,
+      benchmark.pipelineFps,
+      benchmark.videoFps
+    );
+    if (Number.isFinite(fps)) return fps;
+  }
+  return firstFiniteNumber(
+    state.values['benchmark.fps'],
+    state.values['benchmark.framesPerSecond'],
+    state.values['benchmark.averageFps'],
+    state.values['benchmark.currentFps'],
+    state.values['benchmark.avgFps'],
+    state.values['benchmark.processingFps'],
+    state.values['benchmark.pipelineFps'],
+    state.values['benchmark.videoFps'],
+    state.values['benchmark.average_fps'],
+    state.values['benchmark.current_fps'],
+    state.values['benchmark.processing_fps'],
+    state.values['benchmark.pipeline_fps'],
+    state.values['benchmark.video_fps'],
+    state.values['fps'],
+    state.values['framesPerSecond'],
+    state.values['averageFps'],
+    state.values['currentFps'],
+    state.values['avgFps'],
+    state.values['processingFps'],
+    state.values['pipelineFps'],
+    state.values['videoFps'],
+    state.values['average_fps'],
+    state.values['current_fps'],
+    state.values['processing_fps'],
+    state.values['pipeline_fps'],
+    state.values['video_fps']
+  );
+}
+
+function firstFiniteNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return NaN;
+}
+
+function sparklinePoints(values) {
+  if (!values.length) return '';
+  if (values.length === 1) return `0,7 40,7`;
+  const width = 40;
+  const height = 14;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(1, max - min);
+  return values.map((value, index) => {
+    const x = (index / (values.length - 1)) * width;
+    const y = height - (((value - min) / range) * (height - 2)) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
 }
 
 function updateVersion(version) {

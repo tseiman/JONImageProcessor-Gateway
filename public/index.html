@@ -18,7 +18,12 @@
     <div id="message" class="message" aria-live="polite"></div>
     <div class="status">
       <b id="connectionStatus">Disconnected</b>
-      <span id="fpsStatus">FPS --</span>
+      <span id="fpsStatus" class="fps-status">
+        <span class="fps-label">FPS --</span>
+        <svg class="fps-sparkline" viewBox="0 0 40 14" aria-hidden="true">
+          <polyline points=""></polyline>
+        </svg>
+      </span>
       <span id="latencyStatus">Latency --</span>
       <span id="versionStatus">Version --</span>
       <span id="ipcStatus">IPC idle</span>

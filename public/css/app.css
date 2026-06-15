@@ -73,6 +73,27 @@ button, input, select {
   color: var(--green);
 }
 
+.fps-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 92px;
+}
+
+.fps-sparkline {
+  width: 40px;
+  height: 14px;
+  overflow: visible;
+}
+
+.fps-sparkline polyline {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
