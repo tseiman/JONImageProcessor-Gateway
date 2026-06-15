@@ -4,6 +4,22 @@ import { handleIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+const connections = new Set();
+let mutationPollRequester = () => {};
+
+export function setMutationPollRequester(fn) {
+  mutationPollRequester = fn;
+}
+
+export function websocketClientCount() {
+  return connections.size;
+}
+
+export function broadcastJson(value) {
+  for (const connection of connections) {
+    connection.sendJson(value);
+  }
+}
 
 export function handleUpgrade(req, socket, head, config) {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -41,6 +57,15 @@ export function handleUpgrade(req, socket, head, config) {
   ].join('\r\n'));
 
   const connection = new WebSocketConnection(socket);
+  connections.add(connection);
+  connection.onClose = () => {
+    connections.delete(connection);
+    log('info', 'WebSocket client disconnected', { clients: connections.size });
+  };
+  log('info', 'WebSocket client connected', { clients: connections.size });
+  connection.sendJson({ type: 'hello', clients: connections.size, time: new Date().toISOString() });
+  mutationPollRequester('websocket-connect');
+
   connection.onMessage = async (message) => {
     try {
       const body = JSON.parse(message);
@@ -56,10 +81,11 @@ export function handleUpgrade(req, socket, head, config) {
           ipcError: response.error
         });
       }
-      connection.sendJson(response);
+      connection.sendJson({ type: 'ipc-response', request: { cmd: body?.cmd, key: body?.key }, response });
+      if (body?.cmd === 'set') mutationPollRequester('websocket-set');
     } catch (error) {
       log('warn', 'WebSocket message handling failed', errorFields(error));
-      connection.sendJson({ ok: false, error: error.message });
+      connection.sendJson({ type: 'error', ok: false, error: error.message });
     }
   };
 
@@ -70,9 +96,19 @@ class WebSocketConnection {
   constructor(socket) {
     this.socket = socket;
     this.buffer = Buffer.alloc(0);
+    this.closed = false;
     this.onMessage = () => {};
+    this.onClose = () => {};
     socket.on('data', (chunk) => this.receive(chunk));
     socket.on('error', () => socket.destroy());
+    socket.on('close', () => this.handleClose());
+    socket.on('end', () => this.handleClose());
+  }
+
+  handleClose() {
+    if (this.closed) return;
+    this.closed = true;
+    this.onClose();
   }
 
   receive(chunk) {
@@ -118,7 +154,11 @@ class WebSocketConnection {
   }
 
   sendJson(value) {
-    this.sendFrame(Buffer.from(JSON.stringify(value), 'utf8'), 0x1);
+    try {
+      this.sendFrame(Buffer.from(JSON.stringify(value), 'utf8'), 0x1);
+    } catch {
+      this.socket.destroy();
+    }
   }
 
   sendFrame(payload, opcode) {

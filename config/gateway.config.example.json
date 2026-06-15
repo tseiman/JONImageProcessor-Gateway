@@ -11,7 +11,8 @@
   },
   "jonImageProcessor": {
     "ipcSocket": "/tmp/jonimageprocessor.sock",
-    "requestTimeoutMs": 2000
+    "requestTimeoutMs": 2000,
+    "pollIntervalMs": 1000
   },
   "files": {
     "maxUploadBytes": 52428800,

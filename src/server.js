@@ -6,13 +6,16 @@ import { loadConfig, publicConfig } from './config.js';
 import { extractToken, isAuthorized } from './auth.js';
 import { sendIpcRequest } from './ipcClient.js';
 import { deleteFile, httpError, listFiles, uploadFile } from './fileStore.js';
-import { handleUpgrade } from './websocket.js';
+import { handleUpgrade, setMutationPollRequester } from './websocket.js';
 import { prepareIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
+import { startStatePolling } from './statePoller.js';
 
 const config = loadConfig();
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
 let nextRequestId = 1;
+const statePoller = startStatePolling(config);
+setMutationPollRequester(statePoller.requestPoll);
 
 const server = http.createServer(async (req, res) => {
   const requestId = nextRequestId++;
@@ -86,6 +89,7 @@ const server = http.createServer(async (req, res) => {
           ipcError: response.error
         });
       }
+      if (prepared.request.cmd === 'set') statePoller.requestPoll('http-set');
       await writeJson(req, res, response.ok === false ? 502 : 200, response);
       return;
     }

@@ -5,7 +5,10 @@ const state = {
   schema: null,
   values: {},
   assets: { backgrounds: [], pause: [] },
-  busy: false
+  pending: {},
+  ws: null,
+  wsReconnectTimer: null,
+  wsConnected: false
 };
 
 const elements = {
@@ -125,7 +128,7 @@ async function loadSchema() {
 
 async function loadValues() {
   const result = await ipc({ cmd: 'list' });
-  state.values = flattenValues(result);
+  applyState(result);
   updateBenchmark(state.values.benchmark);
 }
 
@@ -158,6 +161,85 @@ function updateBenchmark(benchmark) {
   }
   const fps = benchmark.fps || benchmark.framesPerSecond || benchmark.averageFps;
   elements.fpsStatus.textContent = fps ? `FPS ${Number(fps).toFixed(1)}` : 'FPS --';
+}
+
+function connectWebSocket() {
+  if (!state.token || state.ws?.readyState === WebSocket.OPEN || state.ws?.readyState === WebSocket.CONNECTING) return;
+  clearTimeout(state.wsReconnectTimer);
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${location.host}/api/ws?token=${encodeURIComponent(state.token)}`);
+  state.ws = ws;
+
+  ws.addEventListener('open', () => {
+    state.wsConnected = true;
+    setConnected(true);
+  });
+
+  ws.addEventListener('message', (event) => {
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (message.type === 'state') {
+      applyState(message.state);
+      render();
+      updateBenchmark(state.values.benchmark);
+      setConnected(true);
+    } else if (message.type === 'state-error') {
+      showMessage(message.error || 'State update failed', true);
+    }
+  });
+
+  ws.addEventListener('close', () => scheduleWebSocketReconnect());
+  ws.addEventListener('error', () => {
+    ws.close();
+  });
+}
+
+function scheduleWebSocketReconnect() {
+  state.wsConnected = false;
+  setConnected(false);
+  clearTimeout(state.wsReconnectTimer);
+  if (!state.token) return;
+  state.wsReconnectTimer = setTimeout(connectWebSocket, 1500);
+}
+
+function closeWebSocket() {
+  clearTimeout(state.wsReconnectTimer);
+  state.wsReconnectTimer = null;
+  state.wsConnected = false;
+  if (state.ws) {
+    state.ws.close();
+    state.ws = null;
+  }
+}
+
+function applyState(nextState) {
+  const flat = flattenValues(nextState);
+  for (const [key, value] of Object.entries(flat)) {
+    const pending = state.pending[key];
+    if (pending) {
+      if (valuesEquivalent(key, value, pending.expected)) {
+        clearTimeout(pending.timer);
+        delete state.pending[key];
+        state.values[key] = value;
+      }
+      continue;
+    }
+    state.values[key] = value;
+  }
+}
+
+function valuesEquivalent(key, actual, expected) {
+  if (key.endsWith('.image')) {
+    return assetIdFromValue(actual) === assetIdFromValue(expected);
+  }
+  if (typeof actual === 'number' || typeof expected === 'number') {
+    return Math.abs(Number(actual) - Number(expected)) < 0.000001;
+  }
+  return actual === expected;
 }
 
 function render() {
@@ -200,6 +282,8 @@ function renderControl(key, rule) {
 function controlShell(key, rangeText = '') {
   const control = document.createElement('div');
   control.className = 'control';
+  control.dataset.key = key;
+  control.classList.toggle('pending', Boolean(state.pending[key]));
   const label = document.createElement('div');
   label.className = 'label';
   label.innerHTML = `<span>${LABELS[key] || key}</span><span>${rangeText}</span>`;
@@ -346,12 +430,29 @@ function assetIdFromValue(value) {
 }
 
 async function setValue(key, value) {
+  const previous = state.values[key];
+  clearTimeout(state.pending[key]?.timer);
+  state.values[key] = value;
+  state.pending[key] = {
+    expected: value,
+    previous,
+    timer: setTimeout(() => {
+      state.values[key] = previous;
+      delete state.pending[key];
+      render();
+      showMessage(`${LABELS[key] || key} did not confirm in time`, true);
+    }, 2500)
+  };
+  render();
+
   try {
     await ipc({ cmd: 'set', key, value });
-    state.values[key] = value;
-    await refresh(false);
-    showMessage(`${LABELS[key] || key} updated`);
+    showMessage(`${LABELS[key] || key} sent`);
   } catch (error) {
+    clearTimeout(state.pending[key]?.timer);
+    state.values[key] = previous;
+    delete state.pending[key];
+    render();
     showMessage(error.message, true);
   }
 }
@@ -399,6 +500,7 @@ async function refresh(showOk = true) {
     await loadAssets();
     await loadValues();
     render();
+    connectWebSocket();
     setConnected(true);
     if (showOk) showMessage('State refreshed');
   } catch (error) {
@@ -527,6 +629,7 @@ elements.saveTokenButton.addEventListener('click', (event) => {
   state.token = elements.tokenInput.value.trim();
   localStorage.setItem(TOKEN_KEY, state.token);
   state.schema = null;
+  closeWebSocket();
   elements.settingsDialog.close();
   refresh();
 });
@@ -537,6 +640,7 @@ elements.clearTokenButton.addEventListener('click', (event) => {
   localStorage.removeItem(TOKEN_KEY);
   elements.tokenInput.value = '';
   state.schema = null;
+  closeWebSocket();
   setConnected(false);
 });
 

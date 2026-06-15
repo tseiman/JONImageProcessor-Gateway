@@ -43,6 +43,7 @@ function normalizeConfig(config) {
   config.jonImageProcessor ??= {};
   config.jonImageProcessor.ipcSocket ??= '/tmp/jonimageprocessor.sock';
   config.jonImageProcessor.requestTimeoutMs ??= 2000;
+  config.jonImageProcessor.pollIntervalMs ??= 1000;
 
   config.files ??= {};
   config.files.maxUploadBytes ??= 50 * 1024 * 1024;
@@ -58,7 +59,8 @@ export function publicConfig(config) {
     },
     jonImageProcessor: {
       ipcSocket: config.jonImageProcessor.ipcSocket,
-      requestTimeoutMs: config.jonImageProcessor.requestTimeoutMs
+      requestTimeoutMs: config.jonImageProcessor.requestTimeoutMs,
+      pollIntervalMs: config.jonImageProcessor.pollIntervalMs
     },
     files: {
       maxUploadBytes: config.files.maxUploadBytes,

@@ -65,6 +65,7 @@ The important settings are:
 - `server.host` / `server.port`: HTTP bind address.
 - `server.corsAllowedOrigins`: optional list of browser origins allowed to call the API from another site. Use the future local WebUI from the same origin when possible.
 - `jonImageProcessor.ipcSocket`: Unix socket exposed by `JONImageProcessor`.
+- `jonImageProcessor.pollIntervalMs`: interval for polling `list` from the Unix socket and broadcasting state to WebUI clients over WebSocket.
 - `files.roots`: named upload/delete roots, for example `backgrounds` and `pause`.
 - `api.commands`: allowed `list`, `get`, and `set` IPC operations plus value validation for each writable key.
 
@@ -138,6 +139,8 @@ http://127.0.0.1:8080/
 ```
 
 The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
+
+The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value.
 
 Health is intentionally unauthenticated:
 
