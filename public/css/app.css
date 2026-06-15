@@ -305,6 +305,34 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
   padding: 9px;
 }
 
+select {
+  appearance: none;
+  min-height: 42px;
+  padding-right: 42px;
+  cursor: pointer;
+  background:
+    linear-gradient(135deg, transparent 50%, #0d1015 50%) right 14px center / 8px 8px no-repeat,
+    linear-gradient(45deg, transparent 50%, #0d1015 50%) right 20px center / 8px 8px no-repeat,
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 42%, rgba(0, 0, 0, 0.12) 100%),
+    #161c25;
+  border-color: #4d5968;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+select:hover,
+.asset-picker-button:hover {
+  border-color: #607086;
+  background-color: #1a222d;
+}
+
+select:focus,
+.asset-picker-button:focus {
+  outline: 2px solid rgba(77, 163, 255, 0.42);
+  outline-offset: 2px;
+}
+
 .rgb {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -352,13 +380,18 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
 .asset-picker-button {
   width: 100%;
   min-height: 44px;
-  background: #0d1015;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 42%, rgba(0, 0, 0, 0.14) 100%),
+    #161c25;
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid #4d5968;
   border-radius: 8px;
   padding: 8px 34px 8px 10px;
   text-align: left;
   position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .asset-picker-button::after {
@@ -368,8 +401,8 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
   top: 50%;
   width: 8px;
   height: 8px;
-  border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
+  border-right: 2px solid var(--text);
+  border-bottom: 2px solid var(--text);
   transform: translateY(-70%) rotate(45deg);
 }
 
