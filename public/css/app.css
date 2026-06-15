@@ -230,14 +230,20 @@ button:disabled {
   height: 118px;
   user-select: none;
   cursor: pointer;
+  --knob-accent: var(--green);
+}
+
+.knob.small {
+  width: 82px;
+  height: 82px;
 }
 
 .knob-bg { fill: #141922; stroke: #4a5362; stroke-width: 2; }
 .knob-inner { fill: #252d39; stroke: #101318; stroke-width: 2; }
 .knob-range { fill: none; stroke: #3d4654; stroke-width: 8; stroke-linecap: round; }
-.knob-value-arc { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; }
-.knob-pointer { stroke: var(--green); stroke-width: 4; stroke-linecap: round; }
-.knob-dot { fill: var(--green); }
+.knob-value-arc { fill: none; stroke: var(--knob-accent); stroke-width: 8; stroke-linecap: round; }
+.knob-pointer { stroke: var(--knob-accent); stroke-width: 4; stroke-linecap: round; }
+.knob-dot { fill: var(--knob-accent); }
 
 .knob-value {
   margin-top: 8px;
@@ -257,7 +263,25 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
 .rgb {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
+  align-items: start;
+}
+
+.rgb-knob {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+.rgb-knob label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.rgb-knob .knob-value {
+  width: 64px;
+  padding: 5px;
 }
 
 .color-preview {
@@ -272,6 +296,109 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  align-items: start;
+}
+
+.asset-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.asset-picker-button {
+  width: 100%;
+  min-height: 44px;
+  background: #0d1015;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 34px 8px 10px;
+  text-align: left;
+  position: relative;
+}
+
+.asset-picker-button::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.asset-picker-button b,
+.asset-option b {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.asset-picker-button span,
+.asset-option span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.asset-menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 240px;
+  overflow: auto;
+  background: #0d1015;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+}
+
+.asset-menu[hidden] {
+  display: none;
+}
+
+.asset-option {
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.asset-option:hover,
+.asset-option.active {
+  background: var(--panel2);
+}
+
+.asset-detail {
+  min-height: 52px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0d1015;
+  padding: 8px;
+}
+
+.asset-detail b {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.asset-detail span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .upload-row {
@@ -339,9 +466,5 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
   .layout {
     grid-template-columns: 1fr;
     padding: 12px;
-  }
-
-  .preview {
-    min-height: 180px;
   }
 }

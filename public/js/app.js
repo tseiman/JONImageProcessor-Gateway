@@ -80,6 +80,7 @@ const LABELS = {
 };
 
 const BOOLEAN_INVERTED = new Set(['runtime.noMask', 'runtime.noOverlay']);
+const SELECT_ENUM_KEYS = new Set(['pause.font']);
 
 function authHeaders(extra = {}) {
   return {
@@ -312,10 +313,29 @@ function render() {
 function renderControl(key, rule) {
   if (rule.assetRoot) return renderAssetControl(key, rule);
   if (rule.type === 'boolean') return renderBooleanControl(key);
+  if (SELECT_ENUM_KEYS.has(key)) return renderSelectEnumControl(key, rule);
   if (rule.enum) return renderEnumControl(key, rule);
   if (rule.type === 'number' || rule.type === 'integer') return renderNumberControl(key, rule);
   if (key === 'background.overlayColor') return renderRgbControl(key);
   return renderTextControl(key, rule);
+}
+
+function renderSelectEnumControl(key, rule) {
+  const control = controlShell(key);
+  control.dataset.kind = 'select-enum';
+  const select = document.createElement('select');
+  for (const option of rule.enum) {
+    select.appendChild(new Option(title(option), option));
+  }
+  select.value = state.values[key] || rule.enum[0] || '';
+  select.addEventListener('change', () => setValue(key, select.value));
+  control.appendChild(select);
+  return control;
+}
+
+function updateSelectEnumControl(control, key) {
+  const select = control.querySelector('select');
+  if (select && document.activeElement !== select) select.value = state.values[key] || '';
 }
 
 function controlShell(key, rangeText = '') {
@@ -341,6 +361,7 @@ function patchControls(keys) {
     const kind = control.dataset.kind;
     if (kind === 'boolean') updateBooleanControl(control, key);
     else if (kind === 'enum') updateEnumControl(control, key);
+    else if (kind === 'select-enum') updateSelectEnumControl(control, key);
     else if (kind === 'number') updateNumberControl(control, key);
     else if (kind === 'rgb') updateRgbControl(control, key);
     else if (kind === 'asset') updateAssetControl(control, key);
@@ -452,19 +473,40 @@ function renderRgbControl(key) {
   rgb.className = 'rgb';
   const preview = document.createElement('div');
   preview.className = 'color-preview';
-  const inputs = [0, 1, 2].map((index) => {
+  const channels = [
+    { label: 'R', color: '#ff4b4b' },
+    { label: 'G', color: '#38d878' },
+    { label: 'B', color: '#4da3ff' }
+  ];
+  const inputs = channels.map((channel, index) => {
+    const item = document.createElement('div');
+    item.className = 'rgb-knob';
+    const label = document.createElement('label');
+    label.textContent = channel.label;
+    const knob = document.createElement('div');
+    knob.className = 'knob small';
+    knob.style.setProperty('--knob-accent', channel.color);
+    knob.dataset.min = 0;
+    knob.dataset.max = 255;
+    knob.dataset.step = 1;
+    knob.dataset.value = Number.isFinite(value[index]) ? value[index] : 0;
     const input = document.createElement('input');
+    input.className = 'knob-value';
     input.type = 'number';
     input.min = 0;
     input.max = 255;
     input.step = 1;
     input.value = Number.isFinite(value[index]) ? value[index] : 0;
-    input.addEventListener('change', () => {
+    function commitRgb(nextValue) {
+      if (Number.isFinite(nextValue)) input.value = clamp(nextValue, 0, 255);
       const next = inputs.map((item) => clamp(Number(item.value), 0, 255));
       preview.style.background = `rgb(${next.join(',')})`;
       setValue(key, next.join(','));
-    });
-    rgb.appendChild(input);
+    }
+    input.addEventListener('change', commitRgb);
+    item.append(label, knob, input);
+    rgb.appendChild(item);
+    buildKnob(knob, commitRgb);
     return input;
   });
   preview.style.background = `rgb(${inputs.map((item) => item.value).join(',')})`;
@@ -474,7 +516,11 @@ function renderRgbControl(key) {
 
 function updateRgbControl(control, key) {
   const value = String(state.values[key] || '0,255,0').split(',').map((part) => clamp(Number(part), 0, 255));
-  control.querySelectorAll('.rgb input').forEach((input, index) => {
+  control.querySelectorAll('.rgb-knob').forEach((item, index) => {
+    const input = item.querySelector('input');
+    const knob = item.querySelector('.knob');
+    const nextValue = Number.isFinite(value[index]) ? value[index] : 0;
+    if (knob?.setDisplayValue) knob.setDisplayValue(nextValue);
     if (document.activeElement !== input) input.value = Number.isFinite(value[index]) ? value[index] : 0;
   });
   const preview = control.querySelector('.color-preview');
@@ -503,23 +549,18 @@ function renderAssetControl(key, rule) {
   const root = rule.assetRoot;
   const row = document.createElement('div');
   row.className = 'asset-row';
-  const select = document.createElement('select');
   const assets = state.assets[root] || [];
   const selectedAsset = assetIdFromValue(state.values[key]);
-  select.appendChild(new Option('Select asset', ''));
-  for (const asset of assets) {
-    select.appendChild(new Option(`${asset.name} (${asset.type})`, asset.id));
-  }
-  select.value = selectedAsset;
-  select.addEventListener('change', () => {
-    if (select.value) setValue(key, select.value);
+  const picker = buildAssetPicker(control, root, selectedAsset, (assetId) => {
+    updateAssetDetail(control, root, assetId);
+    if (assetId) setValue(key, assetId);
   });
   const deleteButton = document.createElement('button');
   deleteButton.className = 'action';
   deleteButton.textContent = 'Delete';
-  deleteButton.disabled = !select.value;
-  deleteButton.addEventListener('click', () => deleteAsset(root, select.value));
-  row.append(select, deleteButton);
+  deleteButton.disabled = !selectedAsset;
+  deleteButton.addEventListener('click', () => deleteAsset(root, getAssetSelection(control)));
+  row.append(picker, deleteButton);
 
   const upload = document.createElement('div');
   upload.className = 'upload-row';
@@ -531,15 +572,115 @@ function renderAssetControl(key, rule) {
   uploadButton.textContent = 'Upload ZIP';
   uploadButton.addEventListener('click', () => uploadAsset(root, file.files[0]));
   upload.append(file, uploadButton);
-  control.append(row, upload);
+  const detail = document.createElement('div');
+  detail.className = 'asset-detail';
+  control.append(row, detail, upload);
+  updateAssetDetail(control, root, selectedAsset);
   return control;
 }
 
 function updateAssetControl(control, key) {
-  const select = control.querySelector('select');
-  if (select && document.activeElement !== select) select.value = assetIdFromValue(state.values[key]);
+  const selectedAsset = assetIdFromValue(state.values[key]);
+  setAssetSelection(control, selectedAsset);
   const deleteButton = control.querySelector('button.action');
-  if (deleteButton) deleteButton.disabled = !select?.value;
+  if (deleteButton) deleteButton.disabled = !selectedAsset;
+  const rule = state.schema?.api?.commands?.set?.items?.[key];
+  updateAssetDetail(control, rule?.assetRoot, selectedAsset);
+}
+
+function buildAssetPicker(control, root, selectedAsset, onSelect) {
+  const picker = document.createElement('div');
+  picker.className = 'asset-picker';
+  picker.dataset.root = root;
+  picker.dataset.selected = selectedAsset || '';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'asset-picker-button';
+  const menu = document.createElement('div');
+  menu.className = 'asset-menu';
+  menu.hidden = true;
+
+  const empty = document.createElement('button');
+  empty.type = 'button';
+  empty.className = 'asset-option';
+  empty.dataset.assetId = '';
+  empty.innerHTML = '<b>Select asset</b><span>No asset selected</span>';
+  empty.addEventListener('click', () => {
+    setAssetSelection(control, '');
+    menu.hidden = true;
+    onSelect('');
+  });
+  menu.appendChild(empty);
+
+  for (const asset of state.assets[root] || []) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'asset-option';
+    option.dataset.assetId = asset.id;
+    option.innerHTML = assetOptionHtml(asset);
+    option.addEventListener('click', () => {
+      setAssetSelection(control, asset.id);
+      menu.hidden = true;
+      onSelect(asset.id);
+    });
+    menu.appendChild(option);
+  }
+
+  button.addEventListener('click', () => {
+    closeAssetMenus(picker);
+    menu.hidden = !menu.hidden;
+  });
+
+  picker.append(button, menu);
+  setAssetSelectionElement(picker, selectedAsset);
+  return picker;
+}
+
+function closeAssetMenus(except) {
+  document.querySelectorAll('.asset-picker').forEach((picker) => {
+    if (picker !== except) {
+      const menu = picker.querySelector('.asset-menu');
+      if (menu) menu.hidden = true;
+    }
+  });
+}
+
+function getAssetSelection(control) {
+  return control.querySelector('.asset-picker')?.dataset.selected || '';
+}
+
+function setAssetSelection(control, assetId) {
+  const picker = control.querySelector('.asset-picker');
+  if (picker) setAssetSelectionElement(picker, assetId);
+}
+
+function setAssetSelectionElement(picker, assetId) {
+  const root = picker.dataset.root;
+  const asset = (state.assets[root] || []).find((item) => item.id === assetId);
+  picker.dataset.selected = asset?.id || '';
+  const button = picker.querySelector('.asset-picker-button');
+  if (button) {
+    button.innerHTML = asset ? assetOptionHtml(asset) : '<b>Select asset</b><span>No asset selected</span>';
+  }
+  picker.querySelectorAll('.asset-option').forEach((option) => {
+    option.classList.toggle('active', option.dataset.assetId === picker.dataset.selected);
+  });
+}
+
+function assetOptionHtml(asset) {
+  return `<b>${escapeHtml(asset.name)} (${escapeHtml(asset.type)})</b><span>${escapeHtml(asset.description || '')}</span>`;
+}
+
+function updateAssetDetail(control, root, assetId) {
+  const detail = control.querySelector('.asset-detail');
+  if (!detail) return;
+  const asset = (state.assets[root] || []).find((item) => item.id === assetId);
+  if (!asset) {
+    detail.innerHTML = '<span>No asset selected</span>';
+    return;
+  }
+  detail.innerHTML = assetOptionHtml(asset);
 }
 
 function assetIdFromValue(value) {
@@ -640,6 +781,14 @@ function title(value) {
   return String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function polarToCartesian(cx, cy, r, angleDeg) {
   const angleRad = (angleDeg - 90) * Math.PI / 180;
   return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
@@ -700,7 +849,7 @@ function buildKnob(knob, onCommit) {
   knob.setDisplayValue = setDisplay;
 
   function commit() {
-    onCommit(Number(knob.dataset.value));
+    onCommit(Number(knob.dataset.value), knob);
   }
 
   setDisplay(Number(knob.dataset.value));
@@ -749,6 +898,10 @@ elements.settingsButton.addEventListener('click', () => {
 });
 
 elements.refreshButton.addEventListener('click', () => refresh());
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.asset-picker')) closeAssetMenus();
+});
 
 elements.showTokenInput.addEventListener('change', () => {
   elements.tokenInput.type = elements.showTokenInput.checked ? 'text' : 'password';
