@@ -140,37 +140,26 @@ button:disabled {
   font-size: 20px;
 }
 
-.preview {
-  min-height: 300px;
-  background: #05070a;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-.preview strong {
-  display: block;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-
-.preview span {
-  display: block;
-  font-size: 13px;
-}
-
 .message {
-  margin-bottom: 16px;
+  flex: 1;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  visibility: hidden;
+  opacity: 0;
   border: 1px solid var(--border);
   border-left: 4px solid var(--blue);
   background: #121821;
   border-radius: 8px;
-  padding: 12px;
+  padding: 7px 10px;
   color: var(--text);
+  font-size: 13px;
+  transition: opacity 120ms ease;
+}
+
+.message.visible {
+  visibility: visible;
+  opacity: 1;
 }
 
 .message.error {
@@ -336,6 +325,10 @@ input[type=file], select, input[type=number], input[type=password], input[type=t
     align-items: flex-start;
     flex-direction: column;
     padding: 14px;
+  }
+
+  .message {
+    width: 100%;
   }
 
   .status {

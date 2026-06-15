@@ -15,6 +15,7 @@
         <span>Gateway Control</span>
       </div>
     </div>
+    <div id="message" class="message" aria-live="polite"></div>
     <div class="status">
       <b id="connectionStatus">Disconnected</b>
       <span id="fpsStatus">FPS --</span>
@@ -39,14 +40,6 @@
     </aside>
 
     <main>
-      <div class="preview">
-        <div>
-          <strong>LIVE PREVIEW</strong>
-          <span>Preview stream will be added later</span>
-        </div>
-      </div>
-
-      <div id="message" class="message" hidden></div>
       <div id="stages" class="stages"></div>
     </main>
   </div>
@@ -64,6 +57,10 @@
       <label class="checkbox">
         <input id="showTokenInput" type="checkbox">
         <span>Show token</span>
+      </label>
+      <label class="field">
+        <span>Control confirmation timeout (ms)</span>
+        <input id="confirmTimeoutInput" type="number" min="500" max="15000" step="100">
       </label>
       <div class="dialog-actions">
         <button id="clearTokenButton" value="clear" class="secondary">Clear</button>

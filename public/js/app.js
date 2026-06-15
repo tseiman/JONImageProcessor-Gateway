@@ -1,7 +1,10 @@
 const TOKEN_KEY = 'jonGatewayToken';
+const CONFIRM_TIMEOUT_KEY = 'jonGatewayConfirmTimeoutMs';
+const DEFAULT_CONFIRM_TIMEOUT_MS = 2500;
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || '',
+  confirmTimeoutMs: readConfirmTimeout(),
   schema: null,
   values: {},
   assets: { backgrounds: [], pause: [] },
@@ -23,6 +26,7 @@ const elements = {
   settingsDialog: document.querySelector('#settingsDialog'),
   tokenInput: document.querySelector('#tokenInput'),
   showTokenInput: document.querySelector('#showTokenInput'),
+  confirmTimeoutInput: document.querySelector('#confirmTimeoutInput'),
   saveTokenButton: document.querySelector('#saveTokenButton'),
   clearTokenButton: document.querySelector('#clearTokenButton')
 };
@@ -107,13 +111,22 @@ async function ipc(request) {
 }
 
 function showMessage(text, error = false) {
-  elements.message.hidden = false;
   elements.message.textContent = text;
   elements.message.classList.toggle('error', error);
+  elements.message.classList.add('visible');
   clearTimeout(showMessage.timer);
   showMessage.timer = setTimeout(() => {
-    elements.message.hidden = true;
+    elements.message.textContent = '';
+    elements.message.classList.remove('visible', 'error');
   }, error ? 7000 : 3000);
+}
+
+function readConfirmTimeout() {
+  const raw = localStorage.getItem(CONFIRM_TIMEOUT_KEY);
+  if (raw === null || raw === '') return DEFAULT_CONFIRM_TIMEOUT_MS;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return DEFAULT_CONFIRM_TIMEOUT_MS;
+  return clamp(value, 500, 15000);
 }
 
 function setConnected(connected) {
@@ -441,7 +454,7 @@ async function setValue(key, value) {
       delete state.pending[key];
       render();
       showMessage(`${LABELS[key] || key} did not confirm in time`, true);
-    }, 2500)
+    }, state.confirmTimeoutMs)
   };
   render();
 
@@ -615,6 +628,7 @@ function buildKnob(knob, onCommit) {
 
 elements.settingsButton.addEventListener('click', () => {
   elements.tokenInput.value = state.token;
+  elements.confirmTimeoutInput.value = state.confirmTimeoutMs;
   elements.settingsDialog.showModal();
 });
 
@@ -627,7 +641,9 @@ elements.showTokenInput.addEventListener('change', () => {
 elements.saveTokenButton.addEventListener('click', (event) => {
   event.preventDefault();
   state.token = elements.tokenInput.value.trim();
+  state.confirmTimeoutMs = clamp(Number(elements.confirmTimeoutInput.value), 500, 15000);
   localStorage.setItem(TOKEN_KEY, state.token);
+  localStorage.setItem(CONFIRM_TIMEOUT_KEY, String(state.confirmTimeoutMs));
   state.schema = null;
   closeWebSocket();
   elements.settingsDialog.close();

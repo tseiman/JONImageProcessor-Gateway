@@ -140,7 +140,7 @@ http://127.0.0.1:8080/
 
 The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
 
-The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value.
+The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value. The browser-side confirmation timeout is configurable in the WebUI settings dialog.
 
 Health is intentionally unauthenticated:
 
