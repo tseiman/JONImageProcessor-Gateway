@@ -480,9 +480,11 @@ select:focus,
 }
 
 .upload-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  margin-top: 10px;
+}
+
+.upload-button {
+  width: 100%;
 }
 
 .settings-dialog {

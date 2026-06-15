@@ -780,10 +780,16 @@ function renderAssetControl(key, rule) {
   const file = document.createElement('input');
   file.type = 'file';
   file.accept = '.zip,application/zip';
+  file.className = 'hidden-file';
+  file.addEventListener('change', () => {
+    uploadAsset(root, file.files[0]).finally(() => {
+      file.value = '';
+    });
+  });
   const uploadButton = document.createElement('button');
-  uploadButton.className = 'action';
+  uploadButton.className = 'action upload-button';
   uploadButton.textContent = 'Upload ZIP';
-  uploadButton.addEventListener('click', () => uploadAsset(root, file.files[0]));
+  uploadButton.addEventListener('click', () => file.click());
   upload.append(file, uploadButton);
   const detail = document.createElement('div');
   detail.className = 'asset-detail';
