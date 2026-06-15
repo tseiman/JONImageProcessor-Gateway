@@ -6,7 +6,8 @@
   "main": "bin/server.js",
   "scripts": {
     "start": "node bin/server.js",
-    "check": "node --check bin/*.js src/*.js public/js/*.js",
+    "version:write": "node scripts/update-version-info.js",
+    "check": "node --check bin/*.js scripts/*.js src/*.js public/js/*.js",
     "test": "node --test"
   },
   "engines": {

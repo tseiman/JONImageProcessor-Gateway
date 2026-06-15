@@ -117,6 +117,51 @@ button, input, select {
   margin: 14px 0;
 }
 
+.preset-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.preset-empty {
+  min-height: 38px;
+  display: grid;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.preset-item {
+  display: grid;
+  grid-template-columns: 1fr 34px 34px;
+  gap: 6px;
+  align-items: center;
+}
+
+.preset-item .preset-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.preset-item .icon-button {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.preset-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hidden-file {
+  display: none;
+}
+
 .preset-button, .action, .icon-button, .enum button, .toggle button, .primary, .secondary {
   background: var(--panel2);
   color: var(--text);

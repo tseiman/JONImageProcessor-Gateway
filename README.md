@@ -28,6 +28,7 @@ Install the application from a checkout on the target machine:
 
 ```bash
 npm install --omit=dev
+npm run version:write
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway/bin
 sudo install -d -m 755 /opt/JONImageProcessor-Gateway/src
@@ -41,6 +42,8 @@ sudo cp config/gateway.config.example.json /opt/JONImageProcessor-Gateway/etc/ga
 ```
 
 The files copied to `/opt/JONImageProcessor-Gateway/bin` and `/opt/JONImageProcessor-Gateway/src` are the gateway code. `public` contains the WebUI served by the same Node.js process. `node_modules`, `package.json`, and `package-lock.json` are copied so the installed service has the npm dependencies it needs at runtime.
+
+`npm run version:write` writes `src/version-info.json` from the current Git checkout before the files are copied. The running service does not call `git`, so deployments copied without `.git` still show the correct version from that JSON file.
 
 Install the example systemd unit:
 
@@ -140,9 +143,11 @@ http://127.0.0.1:8080/
 
 The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
 
-The top status row shows the gateway Git hash. If the running checkout is exactly on a release tag, the release tag is shown as well. This does not require a build script when `.git` exists in the deployed directory. For deployments copied without `.git`, set `JON_GATEWAY_GIT_HASH` and optionally `JON_GATEWAY_RELEASE_TAG` in `/opt/JONImageProcessor-Gateway/etc/token.env`.
+The top status row shows the gateway Git hash from `src/version-info.json`. If that commit was exactly on a release tag when `npm run version:write` was executed, the release tag is shown as well. The running service never calls `git`. As an emergency override, set `JON_GATEWAY_GIT_HASH` and optionally `JON_GATEWAY_RELEASE_TAG` in `/opt/JONImageProcessor-Gateway/etc/token.env`.
 
 The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value. The browser-side confirmation timeout is configurable in the WebUI settings dialog.
+
+WebUI presets are stored locally in the browser. `Save Preset` stores the current settable values from the gateway schema, clicking a preset sends those values back to the gateway, and the preset list provides delete and JSON export. The preset section also supports JSON import/export for moving browser-local presets between systems.
 
 Health is intentionally unauthenticated:
 

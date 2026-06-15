@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'jonGatewayToken';
 const CONFIRM_TIMEOUT_KEY = 'jonGatewayConfirmTimeoutMs';
+const PRESETS_KEY = 'jonGatewayPresets';
 const DEFAULT_CONFIRM_TIMEOUT_MS = 2500;
 
 const state = {
@@ -7,6 +8,7 @@ const state = {
   confirmTimeoutMs: readConfirmTimeout(),
   schema: null,
   values: {},
+  presets: readPresets(),
   assets: { backgrounds: [], pause: [] },
   pending: {},
   ws: null,
@@ -23,6 +25,14 @@ const elements = {
   latencyStatus: document.querySelector('#latencyStatus'),
   versionStatus: document.querySelector('#versionStatus'),
   ipcStatus: document.querySelector('#ipcStatus'),
+  presetList: document.querySelector('#presetList'),
+  savePresetButton: document.querySelector('#savePresetButton'),
+  importPresetsButton: document.querySelector('#importPresetsButton'),
+  exportPresetsButton: document.querySelector('#exportPresetsButton'),
+  importPresetsInput: document.querySelector('#importPresetsInput'),
+  presetDialog: document.querySelector('#presetDialog'),
+  presetNameInput: document.querySelector('#presetNameInput'),
+  confirmSavePresetButton: document.querySelector('#confirmSavePresetButton'),
   settingsButton: document.querySelector('#settingsButton'),
   refreshButton: document.querySelector('#refreshButton'),
   settingsDialog: document.querySelector('#settingsDialog'),
@@ -279,6 +289,209 @@ function valuesEquivalent(key, actual, expected) {
     return String(actual) === String(expected);
   }
   return actual === expected;
+}
+
+function readPresets() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((preset) => preset?.id && preset?.name && preset?.values && typeof preset.values === 'object');
+  } catch {
+    return [];
+  }
+}
+
+function writePresets() {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(state.presets));
+}
+
+function renderPresets() {
+  elements.presetList.innerHTML = '';
+  if (state.presets.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'preset-empty';
+    empty.textContent = 'No presets saved';
+    elements.presetList.appendChild(empty);
+    return;
+  }
+
+  for (const preset of state.presets) {
+    const item = document.createElement('div');
+    item.className = 'preset-item';
+
+    const applyButton = document.createElement('button');
+    applyButton.className = 'preset-button';
+    applyButton.textContent = preset.name;
+    applyButton.title = preset.name;
+    applyButton.addEventListener('click', () => applyPreset(preset.id));
+
+    const exportButton = document.createElement('button');
+    exportButton.className = 'icon-button';
+    exportButton.title = 'Export preset';
+    exportButton.setAttribute('aria-label', `Export preset ${preset.name}`);
+    exportButton.textContent = '⇩';
+    exportButton.addEventListener('click', () => exportPreset(preset));
+
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'icon-button';
+    deleteButton.title = 'Delete preset';
+    deleteButton.setAttribute('aria-label', `Delete preset ${preset.name}`);
+    deleteButton.textContent = '×';
+    deleteButton.addEventListener('click', () => deletePreset(preset.id));
+
+    item.append(applyButton, exportButton, deleteButton);
+    elements.presetList.appendChild(item);
+  }
+}
+
+function currentPresetValues() {
+  const items = state.schema?.api?.commands?.set?.items || {};
+  const values = {};
+  for (const key of Object.keys(items)) {
+    if (state.values[key] !== undefined) values[key] = state.values[key];
+  }
+  return values;
+}
+
+function savePreset(name) {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    showMessage('Preset name is required', true);
+    return false;
+  }
+
+  const existing = state.presets.find((preset) => preset.name.toLowerCase() === trimmedName.toLowerCase());
+  const preset = {
+    id: existing?.id || `preset-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: trimmedName,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    values: currentPresetValues()
+  };
+  if (Object.keys(preset.values).length === 0) {
+    showMessage('No settings loaded for preset', true);
+    return false;
+  }
+
+  if (existing) {
+    Object.assign(existing, preset);
+  } else {
+    state.presets.push(preset);
+  }
+
+  state.presets.sort((a, b) => a.name.localeCompare(b.name));
+  writePresets();
+  renderPresets();
+  showMessage(`Saved preset ${trimmedName}`);
+  return true;
+}
+
+async function applyPreset(id) {
+  const preset = state.presets.find((item) => item.id === id);
+  if (!preset) return;
+  const items = state.schema?.api?.commands?.set?.items || {};
+  const entries = Object.entries(preset.values || {}).filter(([key, value]) => items[key] && value !== undefined);
+  if (entries.length === 0) {
+    showMessage('Preset has no settings', true);
+    return;
+  }
+
+  let failed = 0;
+  for (const [key, value] of entries) {
+    if (!await setValue(key, value)) failed += 1;
+  }
+  if (failed > 0) {
+    showMessage(`Applied preset ${preset.name} with ${failed} failed setting${failed === 1 ? '' : 's'}`, true);
+  } else {
+    showMessage(`Applied preset ${preset.name}`);
+  }
+}
+
+function deletePreset(id) {
+  const preset = state.presets.find((item) => item.id === id);
+  if (!preset) return;
+  if (!confirm(`Delete preset "${preset.name}"?`)) return;
+  state.presets = state.presets.filter((item) => item.id !== id);
+  writePresets();
+  renderPresets();
+  showMessage(`Deleted preset ${preset.name}`);
+}
+
+function exportPreset(preset) {
+  downloadJson(`jonimageprocessor-preset-${safeFileName(preset.name)}.json`, {
+    type: 'JONImageProcessorGatewayPreset',
+    version: 1,
+    preset
+  });
+}
+
+function exportPresets() {
+  downloadJson('jonimageprocessor-presets.json', {
+    type: 'JONImageProcessorGatewayPresets',
+    version: 1,
+    presets: state.presets
+  });
+}
+
+async function importPresets(file) {
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const incoming = normalizeImportedPresets(data);
+    if (incoming.length === 0) throw new Error('No presets found in file');
+
+    for (const preset of incoming) {
+      const existing = state.presets.find((item) => item.name.toLowerCase() === preset.name.toLowerCase());
+      const next = {
+        id: existing?.id || preset.id || `preset-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: preset.name,
+        createdAt: existing?.createdAt || preset.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        values: preset.values
+      };
+      if (existing) Object.assign(existing, next);
+      else state.presets.push(next);
+    }
+
+    state.presets.sort((a, b) => a.name.localeCompare(b.name));
+    writePresets();
+    renderPresets();
+    showMessage(`Imported ${incoming.length} preset${incoming.length === 1 ? '' : 's'}`);
+  } catch (error) {
+    showMessage(error.message, true);
+  } finally {
+    elements.importPresetsInput.value = '';
+  }
+}
+
+function normalizeImportedPresets(data) {
+  const candidates = Array.isArray(data) ? data : data.presets || (data.preset ? [data.preset] : []);
+  if (!Array.isArray(candidates)) return [];
+  return candidates
+    .filter((preset) => preset?.name && preset?.values && typeof preset.values === 'object')
+    .map((preset) => ({
+      id: typeof preset.id === 'string' ? preset.id : '',
+      name: String(preset.name).trim(),
+      createdAt: typeof preset.createdAt === 'string' ? preset.createdAt : '',
+      values: preset.values
+    }))
+    .filter((preset) => preset.name);
+}
+
+function downloadJson(fileName, data) {
+  const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function safeFileName(value) {
+  return String(value).trim().replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'preset';
 }
 
 function render() {
@@ -714,12 +927,14 @@ async function setValue(key, value) {
       patchControls(changedKeys);
     }
     showMessage(`${LABELS[key] || key} sent`);
+    return true;
   } catch (error) {
     clearTimeout(state.pending[key]?.timer);
     state.values[key] = previous;
     delete state.pending[key];
     patchControls([key]);
     showMessage(error.message, true);
+    return false;
   }
 }
 
@@ -897,6 +1112,27 @@ elements.settingsButton.addEventListener('click', () => {
   elements.settingsDialog.showModal();
 });
 
+elements.savePresetButton.addEventListener('click', () => {
+  elements.presetNameInput.value = '';
+  elements.presetDialog.showModal();
+  elements.presetNameInput.focus();
+});
+
+elements.confirmSavePresetButton.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (savePreset(elements.presetNameInput.value)) elements.presetDialog.close();
+});
+
+elements.importPresetsButton.addEventListener('click', () => {
+  elements.importPresetsInput.click();
+});
+
+elements.importPresetsInput.addEventListener('change', () => {
+  importPresets(elements.importPresetsInput.files[0]);
+});
+
+elements.exportPresetsButton.addEventListener('click', () => exportPresets());
+
 elements.refreshButton.addEventListener('click', () => refresh());
 
 document.addEventListener('click', (event) => {
@@ -929,4 +1165,5 @@ elements.clearTokenButton.addEventListener('click', (event) => {
   setConnected(false);
 });
 
+renderPresets();
 refresh(false);

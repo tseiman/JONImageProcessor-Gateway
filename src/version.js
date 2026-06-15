@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 
 export function gatewayVersion() {
   const packageJson = readPackageJson();
-  const gitHash = process.env.JON_GATEWAY_GIT_HASH || gitOutput(['rev-parse', '--short=7', 'HEAD']);
-  const releaseTag = process.env.JON_GATEWAY_RELEASE_TAG || gitOutput(['describe', '--exact-match', '--tags', 'HEAD']);
+  const versionInfo = readVersionInfo();
+  const gitHash = process.env.JON_GATEWAY_GIT_HASH || versionInfo.gitHash || '';
+  const releaseTag = process.env.JON_GATEWAY_RELEASE_TAG || versionInfo.releaseTag || '';
   return {
     packageVersion: packageJson.version || '0.0.0',
     gitHash: gitHash || 'unknown',
@@ -23,15 +23,11 @@ function readPackageJson() {
   }
 }
 
-function gitOutput(args) {
+function readVersionInfo() {
+  const versionInfoPath = path.resolve(process.cwd(), 'src/version-info.json');
   try {
-    return execFileSync('git', args, {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1000
-    }).trim();
+    return JSON.parse(fs.readFileSync(versionInfoPath, 'utf8'));
   } catch {
-    return '';
+    return {};
   }
 }

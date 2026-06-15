@@ -31,12 +31,14 @@
         <h3>PRESETS</h3>
         <button id="settingsButton" class="icon-button" title="Settings" aria-label="Settings">⚙</button>
       </div>
-      <button class="preset-button" disabled>Default</button>
-      <button class="preset-button" disabled>Green Screen</button>
-      <button class="preset-button" disabled>Blur Background</button>
-      <button class="preset-button" disabled>Office</button>
+      <div id="presetList" class="preset-list"></div>
       <hr>
-      <button class="action" disabled>Save Preset</button>
+      <button id="savePresetButton" class="action">Save Preset</button>
+      <div class="preset-tools">
+        <button id="importPresetsButton" class="action">Import</button>
+        <button id="exportPresetsButton" class="action">Export</button>
+      </div>
+      <input id="importPresetsInput" class="hidden-file" type="file" accept="application/json,.json">
       <button id="refreshButton" class="action">Refresh</button>
     </aside>
 
@@ -66,6 +68,23 @@
       <div class="dialog-actions">
         <button id="clearTokenButton" value="clear" class="secondary">Clear</button>
         <button id="saveTokenButton" value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="presetDialog" class="settings-dialog">
+    <form method="dialog">
+      <div class="dialog-head">
+        <h2>Save Preset</h2>
+        <button value="close" class="icon-button" aria-label="Close">×</button>
+      </div>
+      <label class="field">
+        <span>Name</span>
+        <input id="presetNameInput" type="text" autocomplete="off">
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">Cancel</button>
+        <button id="confirmSavePresetButton" value="save" class="primary">Save</button>
       </div>
     </form>
   </dialog>
