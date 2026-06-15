@@ -94,6 +94,22 @@ button, input, select {
   stroke-linejoin: round;
 }
 
+.status-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  font-size: 17px;
+  border-color: #4d5968;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02) 45%, rgba(0, 0, 0, 0.16) 100%),
+    var(--panel2);
+}
+
+.status-icon:hover {
+  border-color: #607086;
+  background-color: #303846;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;

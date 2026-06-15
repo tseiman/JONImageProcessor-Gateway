@@ -27,6 +27,8 @@
       <span id="latencyStatus">Latency --</span>
       <span id="versionStatus">Version --</span>
       <span id="ipcStatus">IPC idle</span>
+      <button id="settingsButton" class="icon-button status-icon" title="Settings" aria-label="Settings">⚙</button>
+      <button id="refreshButton" class="icon-button status-icon" title="Refresh" aria-label="Refresh">↻</button>
     </div>
   </div>
 
@@ -34,7 +36,6 @@
     <aside class="sidebar">
       <div class="sidebar-head">
         <h3>PRESETS</h3>
-        <button id="settingsButton" class="icon-button" title="Settings" aria-label="Settings">⚙</button>
       </div>
       <div id="presetList" class="preset-list"></div>
       <hr>
@@ -44,7 +45,6 @@
         <button id="exportPresetsButton" class="action">Export</button>
       </div>
       <input id="importPresetsInput" class="hidden-file" type="file" accept="application/json,.json">
-      <button id="refreshButton" class="action">Refresh</button>
     </aside>
 
     <main>

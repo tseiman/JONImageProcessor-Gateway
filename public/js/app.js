@@ -48,8 +48,7 @@ const elements = {
 const STAGES = [
   {
     title: 'INPUT',
-    keys: ['camera.enabled'],
-    extras: ['refresh']
+    keys: ['camera.enabled']
   },
   {
     title: 'MASK',
@@ -585,17 +584,6 @@ function render() {
     for (const key of stage.keys) {
       if (!items[key]) continue;
       section.appendChild(renderControl(key, items[key]));
-    }
-
-    if (stage.extras?.includes('refresh')) {
-      const control = document.createElement('div');
-      control.className = 'control';
-      const button = document.createElement('button');
-      button.className = 'action';
-      button.textContent = 'Refresh State';
-      button.addEventListener('click', refresh);
-      control.appendChild(button);
-      section.appendChild(control);
     }
 
     elements.stages.appendChild(section);
