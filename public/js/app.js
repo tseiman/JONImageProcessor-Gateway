@@ -20,6 +20,7 @@ const elements = {
   connectionStatus: document.querySelector('#connectionStatus'),
   fpsStatus: document.querySelector('#fpsStatus'),
   latencyStatus: document.querySelector('#latencyStatus'),
+  versionStatus: document.querySelector('#versionStatus'),
   ipcStatus: document.querySelector('#ipcStatus'),
   settingsButton: document.querySelector('#settingsButton'),
   refreshButton: document.querySelector('#refreshButton'),
@@ -137,6 +138,7 @@ function setConnected(connected) {
 async function loadSchema() {
   const result = await apiFetch('/api/schema');
   state.schema = result.config;
+  updateVersion(result.config.gateway);
 }
 
 async function loadValues() {
@@ -174,6 +176,17 @@ function updateBenchmark(benchmark) {
   }
   const fps = benchmark.fps || benchmark.framesPerSecond || benchmark.averageFps;
   elements.fpsStatus.textContent = fps ? `FPS ${Number(fps).toFixed(1)}` : 'FPS --';
+}
+
+function updateVersion(version) {
+  if (!version) {
+    elements.versionStatus.textContent = 'Version --';
+    return;
+  }
+  elements.versionStatus.textContent = version.releaseTag
+    ? `${version.releaseTag} ${version.gitHash}`
+    : `git ${version.gitHash}`;
+  elements.versionStatus.title = `Gateway ${version.packageVersion}`;
 }
 
 function connectWebSocket() {

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { gatewayVersion } from './version.js';
 
 const DEFAULT_CONFIG_PATHS = [
   '/opt/JONImageProcessor-Gateway/etc/gateway.config.json',
@@ -52,6 +53,7 @@ function normalizeConfig(config) {
 
 export function publicConfig(config) {
   return {
+    gateway: gatewayVersion(),
     server: {
       host: config.server.host,
       port: config.server.port,

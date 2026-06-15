@@ -140,6 +140,8 @@ http://127.0.0.1:8080/
 
 The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
 
+The top status row shows the gateway Git hash. If the running checkout is exactly on a release tag, the release tag is shown as well. This does not require a build script when `.git` exists in the deployed directory. For deployments copied without `.git`, set `JON_GATEWAY_GIT_HASH` and optionally `JON_GATEWAY_RELEASE_TAG` in `/opt/JONImageProcessor-Gateway/etc/token.env`.
+
 The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value. The browser-side confirmation timeout is configurable in the WebUI settings dialog.
 
 Health is intentionally unauthenticated:
