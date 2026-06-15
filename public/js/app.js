@@ -11,7 +11,8 @@ const state = {
   pending: {},
   ws: null,
   wsReconnectTimer: null,
-  wsConnected: false
+  wsConnected: false,
+  rendered: false
 };
 
 const elements = {
@@ -143,8 +144,9 @@ async function loadSchema() {
 
 async function loadValues() {
   const result = await ipc({ cmd: 'list' });
-  applyState(result);
+  const changedKeys = applyState(result);
   updateBenchmark(state.values.benchmark);
+  return changedKeys;
 }
 
 async function loadAssets() {
@@ -209,8 +211,8 @@ function connectWebSocket() {
       return;
     }
     if (message.type === 'state') {
-      applyState(message.state);
-      render();
+      const changedKeys = applyState(message.state);
+      patchControls(changedKeys);
       updateBenchmark(state.values.benchmark);
       setConnected(true);
     } else if (message.type === 'state-error') {
@@ -244,6 +246,7 @@ function closeWebSocket() {
 
 function applyState(nextState) {
   const flat = flattenValues(nextState);
+  const changedKeys = [];
   for (const [key, value] of Object.entries(flat)) {
     const pending = state.pending[key];
     if (pending) {
@@ -251,11 +254,14 @@ function applyState(nextState) {
         clearTimeout(pending.timer);
         delete state.pending[key];
         state.values[key] = value;
+        changedKeys.push(key);
       }
       continue;
     }
+    if (!valuesEquivalent(key, state.values[key], value)) changedKeys.push(key);
     state.values[key] = value;
   }
+  return changedKeys;
 }
 
 function valuesEquivalent(key, actual, expected) {
@@ -264,6 +270,9 @@ function valuesEquivalent(key, actual, expected) {
   }
   if (typeof actual === 'number' || typeof expected === 'number') {
     return Math.abs(Number(actual) - Number(expected)) < 0.000001;
+  }
+  if (typeof actual === 'boolean' || typeof expected === 'boolean') {
+    return String(actual) === String(expected);
   }
   return actual === expected;
 }
@@ -294,6 +303,7 @@ function render() {
 
     elements.stages.appendChild(section);
   }
+  state.rendered = true;
 }
 
 function renderControl(key, rule) {
@@ -317,8 +327,35 @@ function controlShell(key, rangeText = '') {
   return control;
 }
 
+function patchControls(keys) {
+  if (!state.rendered) return;
+  const uniqueKeys = keys?.length ? [...new Set(keys)] : Object.keys(state.values);
+  for (const key of uniqueKeys) {
+    const control = document.querySelector(`.control[data-key="${cssEscape(key)}"]`);
+    if (!control) continue;
+    control.classList.toggle('pending', Boolean(state.pending[key]));
+    if (controlIsBusy(control, key)) continue;
+    const kind = control.dataset.kind;
+    if (kind === 'boolean') updateBooleanControl(control, key);
+    else if (kind === 'enum') updateEnumControl(control, key);
+    else if (kind === 'number') updateNumberControl(control, key);
+    else if (kind === 'rgb') updateRgbControl(control, key);
+    else if (kind === 'asset') updateAssetControl(control, key);
+    else if (kind === 'text') updateTextControl(control, key);
+  }
+}
+
+function controlIsBusy(control, key) {
+  return Boolean(state.pending[key]) || control.dataset.dragging === 'true' || control.contains(document.activeElement);
+}
+
+function cssEscape(value) {
+  return String(value).replace(/["\\]/g, '\\$&');
+}
+
 function renderBooleanControl(key) {
   const control = controlShell(key);
+  control.dataset.kind = 'boolean';
   const group = document.createElement('div');
   group.className = 'toggle';
   const value = Boolean(state.values[key]);
@@ -326,6 +363,7 @@ function renderBooleanControl(key) {
   for (const option of [true, false]) {
     const button = document.createElement('button');
     button.textContent = option ? 'ON' : 'OFF';
+    button.dataset.value = String(option);
     button.classList.toggle('active', effective === option);
     button.addEventListener('click', () => setValue(key, BOOLEAN_INVERTED.has(key) ? !option : option));
     group.appendChild(button);
@@ -334,13 +372,23 @@ function renderBooleanControl(key) {
   return control;
 }
 
+function updateBooleanControl(control, key) {
+  const value = Boolean(state.values[key]);
+  const effective = BOOLEAN_INVERTED.has(key) ? !value : value;
+  control.querySelectorAll('button[data-value]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.value === String(effective));
+  });
+}
+
 function renderEnumControl(key, rule) {
   const control = controlShell(key);
+  control.dataset.kind = 'enum';
   const group = document.createElement('div');
   group.className = 'enum';
   for (const option of rule.enum) {
     const button = document.createElement('button');
     button.textContent = title(option);
+    button.dataset.value = option;
     button.classList.toggle('active', state.values[key] === option);
     button.addEventListener('click', () => setValue(key, option));
     group.appendChild(button);
@@ -349,12 +397,20 @@ function renderEnumControl(key, rule) {
   return control;
 }
 
+function updateEnumControl(control, key) {
+  const value = String(state.values[key]);
+  control.querySelectorAll('button[data-value]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.value === value);
+  });
+}
+
 function renderNumberControl(key, rule) {
   const min = rule.min ?? 0;
   const max = rule.max ?? 100;
   const step = rule.type === 'integer' ? 1 : 0.01;
   const value = Number(state.values[key] ?? min);
   const control = controlShell(key, `${min} bis ${max}`);
+  control.dataset.kind = 'number';
   const wrap = document.createElement('div');
   wrap.className = 'knob-wrap';
   const knob = document.createElement('div');
@@ -376,9 +432,19 @@ function renderNumberControl(key, rule) {
   return control;
 }
 
+function updateNumberControl(control, key) {
+  const value = Number(state.values[key]);
+  if (!Number.isFinite(value)) return;
+  const knob = control.querySelector('.knob');
+  if (knob?.setDisplayValue) knob.setDisplayValue(value);
+  const input = control.querySelector('.knob-value');
+  if (input && document.activeElement !== input) input.value = knob?.dataset.value ?? String(value);
+}
+
 function renderRgbControl(key) {
   const value = String(state.values[key] || '0,255,0').split(',').map((part) => Number(part));
   const control = controlShell(key, '0 bis 255');
+  control.dataset.kind = 'rgb';
   const rgb = document.createElement('div');
   rgb.className = 'rgb';
   const preview = document.createElement('div');
@@ -403,8 +469,18 @@ function renderRgbControl(key) {
   return control;
 }
 
+function updateRgbControl(control, key) {
+  const value = String(state.values[key] || '0,255,0').split(',').map((part) => clamp(Number(part), 0, 255));
+  control.querySelectorAll('.rgb input').forEach((input, index) => {
+    if (document.activeElement !== input) input.value = Number.isFinite(value[index]) ? value[index] : 0;
+  });
+  const preview = control.querySelector('.color-preview');
+  if (preview) preview.style.background = `rgb(${value.map((part) => Number.isFinite(part) ? part : 0).join(',')})`;
+}
+
 function renderTextControl(key) {
   const control = controlShell(key);
+  control.dataset.kind = 'text';
   const input = document.createElement('input');
   input.type = 'text';
   input.value = state.values[key] || '';
@@ -413,8 +489,14 @@ function renderTextControl(key) {
   return control;
 }
 
+function updateTextControl(control, key) {
+  const input = control.querySelector('input');
+  if (input && document.activeElement !== input) input.value = state.values[key] || '';
+}
+
 function renderAssetControl(key, rule) {
   const control = controlShell(key);
+  control.dataset.kind = 'asset';
   const root = rule.assetRoot;
   const row = document.createElement('div');
   row.className = 'asset-row';
@@ -450,6 +532,13 @@ function renderAssetControl(key, rule) {
   return control;
 }
 
+function updateAssetControl(control, key) {
+  const select = control.querySelector('select');
+  if (select && document.activeElement !== select) select.value = assetIdFromValue(state.values[key]);
+  const deleteButton = control.querySelector('button.action');
+  if (deleteButton) deleteButton.disabled = !select?.value;
+}
+
 function assetIdFromValue(value) {
   if (!value || typeof value !== 'string') return '';
   return value.split('/')[0];
@@ -465,20 +554,27 @@ async function setValue(key, value) {
     timer: setTimeout(() => {
       state.values[key] = previous;
       delete state.pending[key];
-      render();
+      patchControls([key]);
       showMessage(`${LABELS[key] || key} did not confirm in time`, true);
     }, state.confirmTimeoutMs)
   };
-  render();
+  patchControls([key]);
 
   try {
     await ipc({ cmd: 'set', key, value });
+    clearTimeout(state.pending[key]?.timer);
+    delete state.pending[key];
+    patchControls([key]);
+    if (!state.wsConnected) {
+      const changedKeys = await loadValues();
+      patchControls(changedKeys);
+    }
     showMessage(`${LABELS[key] || key} sent`);
   } catch (error) {
     clearTimeout(state.pending[key]?.timer);
     state.values[key] = previous;
     delete state.pending[key];
-    render();
+    patchControls([key]);
     showMessage(error.message, true);
   }
 }
@@ -597,6 +693,7 @@ function buildKnob(knob, onCommit) {
     pointer.setAttribute('transform', `rotate(${angle} 60 60)`);
     valueArc.setAttribute('d', value <= min ? '' : describeArc(60, 60, 48, -135, angle));
   }
+  knob.setDisplayValue = setDisplay;
 
   function commit() {
     onCommit(Number(knob.dataset.value));
@@ -614,6 +711,7 @@ function buildKnob(knob, onCommit) {
 
   knob.addEventListener('pointerdown', (event) => {
     dragging = true;
+    knob.closest('.control').dataset.dragging = 'true';
     startY = event.clientY;
     startValue = Number(knob.dataset.value);
     knob.setPointerCapture(event.pointerId);
@@ -627,6 +725,7 @@ function buildKnob(knob, onCommit) {
 
   knob.addEventListener('pointerup', (event) => {
     dragging = false;
+    knob.closest('.control').dataset.dragging = 'false';
     knob.releasePointerCapture(event.pointerId);
     commit();
   });
