@@ -458,11 +458,11 @@ select:focus,
 .alpha-preview {
   background:
     linear-gradient(var(--preview-color), var(--preview-color)),
-    linear-gradient(45deg, #303846 25%, transparent 25%),
-    linear-gradient(-45deg, #303846 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #303846 75%),
-    linear-gradient(-45deg, transparent 75%, #303846 75%),
-    #0d1015;
+    linear-gradient(45deg, #555c66 25%, transparent 25%),
+    linear-gradient(-45deg, #555c66 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #555c66 75%),
+    linear-gradient(-45deg, transparent 75%, #555c66 75%),
+    #252b33;
   background-position: 0 0, 0 0, 0 5px, 5px -5px, -5px 0;
   background-size: auto, 10px 10px, 10px 10px, 10px 10px, 10px 10px;
 }

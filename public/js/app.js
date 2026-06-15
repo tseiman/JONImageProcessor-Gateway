@@ -60,7 +60,7 @@ const STAGES = [
   },
   {
     title: 'OVERLAY',
-    keys: ['runtime.noOverlay', 'background.overlayAlpha', 'background.overlayColor']
+    keys: ['runtime.noOverlay', 'background.overlayColor']
   },
   {
     title: 'PAUSE',
@@ -597,7 +597,7 @@ function renderControl(key, rule) {
   if (SELECT_ENUM_KEYS.has(key)) return renderSelectEnumControl(key, rule);
   if (rule.enum) return renderEnumControl(key, rule);
   if (rule.type === 'number' || rule.type === 'integer') return renderNumberControl(key, rule);
-  if (key === 'background.overlayColor') return renderRgbControl(key);
+  if (key === 'background.overlayColor') return renderOverlayRgbaControl(key);
   if (key === 'pause.textColor') return renderRgbaControl(key);
   if (key === 'pause.textPosition') return renderPositionControl(key, rule);
   return renderTextControl(key, rule);
@@ -635,7 +635,7 @@ function controlShell(key, rangeText = '') {
 
 function patchControls(keys) {
   if (!state.rendered) return;
-  const uniqueKeys = keys?.length ? [...new Set(keys)] : Object.keys(state.values);
+  const uniqueKeys = keys?.length ? [...new Set(expandPatchKeys(keys))] : Object.keys(state.values);
   for (const key of uniqueKeys) {
     const control = document.querySelector(`.control[data-key="${cssEscape(key)}"]`);
     if (!control) continue;
@@ -648,10 +648,20 @@ function patchControls(keys) {
     else if (kind === 'number') updateNumberControl(control, key);
     else if (kind === 'rgb') updateRgbControl(control, key);
     else if (kind === 'rgba') updateRgbaControl(control, key);
+    else if (kind === 'overlay-rgba') updateOverlayRgbaControl(control);
     else if (kind === 'position') updatePositionControl(control, key);
     else if (kind === 'asset') updateAssetControl(control, key);
     else if (kind === 'text') updateTextControl(control, key);
   }
+}
+
+function expandPatchKeys(keys) {
+  const expanded = [];
+  for (const key of keys) {
+    expanded.push(key);
+    if (key === 'background.overlayAlpha') expanded.push('background.overlayColor');
+  }
+  return expanded;
 }
 
 function controlIsBusy(control, key) {
@@ -872,6 +882,78 @@ function updateRgbaControl(control, key) {
   });
   const preview = control.querySelector('.color-preview');
   if (preview) updateRgbaPreview(preview, value);
+}
+
+function renderOverlayRgbaControl(key) {
+  const value = overlayRgbaValue();
+  const control = controlShell(key, '0 bis 255');
+  control.dataset.kind = 'overlay-rgba';
+  const rgba = document.createElement('div');
+  rgba.className = 'rgba';
+  const preview = document.createElement('div');
+  preview.className = 'color-preview alpha-preview';
+  const channels = [
+    { label: 'R', color: '#ff4b4b' },
+    { label: 'G', color: '#38d878' },
+    { label: 'B', color: '#4da3ff' },
+    { label: 'A', color: '#f2f5f8' }
+  ];
+  const inputs = channels.map((channel, index) => {
+    const item = document.createElement('div');
+    item.className = 'rgba-knob';
+    const label = document.createElement('label');
+    label.textContent = channel.label;
+    const knob = document.createElement('div');
+    knob.className = 'knob tiny';
+    knob.style.setProperty('--knob-accent', channel.color);
+    knob.dataset.min = 0;
+    knob.dataset.max = 255;
+    knob.dataset.step = 1;
+    knob.dataset.value = value[index];
+    const input = document.createElement('input');
+    input.className = 'knob-value';
+    input.type = 'number';
+    input.min = 0;
+    input.max = 255;
+    input.step = 1;
+    input.value = value[index];
+    function commitOverlay(nextValue) {
+      if (Number.isFinite(nextValue)) input.value = clamp(nextValue, 0, 255);
+      const next = inputs.map((item) => Math.round(clamp(Number(item.value), 0, 255)));
+      updateRgbaPreview(preview, next);
+      setValue(key, next.slice(0, 3).join(','));
+      setValue('background.overlayAlpha', Number((next[3] / 255).toFixed(4)));
+    }
+    input.addEventListener('change', commitOverlay);
+    item.append(label, knob, input);
+    rgba.appendChild(item);
+    buildKnob(knob, commitOverlay);
+    return input;
+  });
+  updateRgbaPreview(preview, value);
+  control.append(rgba, preview);
+  return control;
+}
+
+function updateOverlayRgbaControl(control) {
+  const value = overlayRgbaValue();
+  control.querySelectorAll('.rgba-knob').forEach((item, index) => {
+    const input = item.querySelector('input');
+    const knob = item.querySelector('.knob');
+    if (knob?.setDisplayValue) knob.setDisplayValue(value[index]);
+    if (input && document.activeElement !== input) input.value = value[index];
+  });
+  const preview = control.querySelector('.color-preview');
+  if (preview) updateRgbaPreview(preview, value);
+}
+
+function overlayRgbaValue() {
+  const rgb = String(state.values['background.overlayColor'] || '0,255,0')
+    .split(',')
+    .map((part) => Math.round(clamp(Number(part), 0, 255)));
+  while (rgb.length < 3) rgb.push(0);
+  const alpha = Math.round(clamp(Number(state.values['background.overlayAlpha'] ?? 1), 0, 1) * 255);
+  return [rgb[0], rgb[1], rgb[2], alpha];
 }
 
 function parseRgbaHex(value) {
