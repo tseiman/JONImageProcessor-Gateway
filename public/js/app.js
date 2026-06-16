@@ -60,7 +60,7 @@ const STAGES = [
   },
   {
     title: 'PAUSE',
-    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.textPosition', 'pause.font']
+    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font']
   }
 ];
 
@@ -624,6 +624,7 @@ function renderControl(key, rule) {
   if (rule.type === 'boolean') return renderBooleanControl(key);
   if (SELECT_ENUM_KEYS.has(key)) return renderSelectEnumControl(key, rule);
   if (rule.enum) return renderEnumControl(key, rule);
+  if (key === 'pause.textSize') return renderPauseTextLayoutControl(key, rule);
   if (rule.type === 'number' || rule.type === 'integer') return renderNumberControl(key, rule);
   if (key === 'background.overlayColor') return renderOverlayRgbaControl(key);
   if (key === 'pause.textColor') return renderRgbaControl(key);
@@ -678,6 +679,7 @@ function patchControls(keys) {
     else if (kind === 'rgba') updateRgbaControl(control, key);
     else if (kind === 'overlay-rgba') updateOverlayRgbaControl(control);
     else if (kind === 'position') updatePositionControl(control, key);
+    else if (kind === 'pause-text-layout') updatePauseTextLayoutControl(control);
     else if (kind === 'asset') updateAssetControl(control, key);
     else if (kind === 'text') updateTextControl(control, key);
   }
@@ -688,6 +690,7 @@ function expandPatchKeys(keys) {
   for (const key of keys) {
     expanded.push(key);
     if (key === 'background.overlayAlpha') expanded.push('background.overlayColor');
+    if (key === 'pause.textPosition') expanded.push('pause.textSize');
   }
   return expanded;
 }
@@ -997,6 +1000,90 @@ function rgbaToHex(values) {
 function updateRgbaPreview(preview, values) {
   const [r, g, b, a] = values.map((value) => Math.round(clamp(Number(value), 0, 255)));
   preview.style.setProperty('--preview-color', `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`);
+}
+
+function renderPauseTextLayoutControl(key, rule) {
+  const positionRule = state.schema?.api?.commands?.set?.items?.['pause.textPosition'] || {};
+  const limits = positionLimits(positionRule);
+  const position = parsePositionValue(state.values['pause.textPosition']);
+  const size = Number(state.values[key] ?? rule.min ?? 1);
+  const sizeLimits = {
+    min: Number(rule.min ?? 0.1),
+    max: Number(rule.max ?? 10),
+    step: rule.type === 'integer' ? 1 : 0.1
+  };
+  const control = controlShell(key, `Size ${sizeLimits.min} bis ${sizeLimits.max}, X/Y`);
+  control.dataset.kind = 'pause-text-layout';
+  const wrap = document.createElement('div');
+  wrap.className = 'pause-text-knobs';
+  const channels = [
+    { key: 'pause.textSize', axis: 'size', label: 'Size', limits: sizeLimits, value: size },
+    { key: 'pause.textPosition', axis: 'x', label: 'X', limits: limits.x, value: position.x },
+    { key: 'pause.textPosition', axis: 'y', label: 'Y', limits: limits.y, value: position.y }
+  ];
+
+  for (const channel of channels) {
+    const item = document.createElement('div');
+    item.className = 'pause-text-knob';
+    item.dataset.axis = channel.axis;
+    const label = document.createElement('label');
+    label.textContent = channel.label;
+    const knob = document.createElement('div');
+    knob.className = 'knob small';
+    knob.dataset.min = channel.limits.min;
+    knob.dataset.max = channel.limits.max;
+    knob.dataset.step = channel.limits.step;
+    knob.dataset.value = Number.isFinite(channel.value) ? channel.value : channel.limits.min;
+    const input = document.createElement('input');
+    input.className = 'knob-value';
+    input.type = 'number';
+    input.min = channel.limits.min;
+    input.max = channel.limits.max;
+    input.step = channel.limits.step;
+    input.value = Number.isFinite(channel.value) ? channel.value : channel.limits.min;
+    function commitPauseText(nextValue) {
+      if (Number.isFinite(nextValue)) input.value = clamp(nextValue, channel.limits.min, channel.limits.max);
+      if (channel.axis === 'size') {
+        setValue('pause.textSize', Number(input.value));
+        return;
+      }
+      const next = pauseTextPositionValues(wrap);
+      setValue('pause.textPosition', `${next.x}x${next.y}`);
+    }
+    item.append(label, knob, input);
+    wrap.appendChild(item);
+    buildKnob(knob, commitPauseText);
+  }
+
+  control.appendChild(wrap);
+  return control;
+}
+
+function updatePauseTextLayoutControl(control) {
+  const position = parsePositionValue(state.values['pause.textPosition']);
+  const values = {
+    size: Number(state.values['pause.textSize']),
+    x: position.x,
+    y: position.y
+  };
+  control.querySelectorAll('.pause-text-knob').forEach((item) => {
+    const axis = item.dataset.axis;
+    const input = item.querySelector('input');
+    const knob = item.querySelector('.knob');
+    const fallback = Number(input?.min || 0);
+    const nextValue = Number.isFinite(values[axis]) ? values[axis] : fallback;
+    if (knob?.setDisplayValue) knob.setDisplayValue(nextValue);
+    if (input && document.activeElement !== input) input.value = knob?.dataset.value ?? String(nextValue);
+  });
+}
+
+function pauseTextPositionValues(wrap) {
+  const xInput = wrap.querySelector('.pause-text-knob[data-axis="x"] input');
+  const yInput = wrap.querySelector('.pause-text-knob[data-axis="y"] input');
+  return {
+    x: Math.round(clamp(Number(xInput?.value), Number(xInput?.min || 0), Number(xInput?.max || 1920))),
+    y: Math.round(clamp(Number(yInput?.value), Number(yInput?.min || 0), Number(yInput?.max || 1080)))
+  };
 }
 
 function renderPositionControl(key, rule) {

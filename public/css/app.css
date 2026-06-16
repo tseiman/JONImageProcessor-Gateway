@@ -454,6 +454,30 @@ select:focus,
   padding: 5px;
 }
 
+.pause-text-knobs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.pause-text-knob {
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+
+.pause-text-knob label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.pause-text-knob .knob-value {
+  width: 72px;
+  padding: 5px;
+}
+
 .color-preview {
   height: 28px;
   border-radius: 7px;
