@@ -745,6 +745,12 @@ select:focus,
   font-size: 13px;
 }
 
+.dialog-copy {
+  margin: 18px 0;
+  color: var(--text);
+  line-height: 1.4;
+}
+
 .checkbox {
   grid-template-columns: auto 1fr;
   align-items: center;

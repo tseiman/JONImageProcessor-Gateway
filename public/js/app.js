@@ -42,6 +42,9 @@ const elements = {
   presetDialog: document.querySelector('#presetDialog'),
   presetNameInput: document.querySelector('#presetNameInput'),
   confirmSavePresetButton: document.querySelector('#confirmSavePresetButton'),
+  defaultPresetDialog: document.querySelector('#defaultPresetDialog'),
+  applyDefaultPresetButton: document.querySelector('#applyDefaultPresetButton'),
+  skipDefaultPresetButton: document.querySelector('#skipDefaultPresetButton'),
   settingsButton: document.querySelector('#settingsButton'),
   refreshButton: document.querySelector('#refreshButton'),
   settingsDialog: document.querySelector('#settingsDialog'),
@@ -737,10 +740,50 @@ async function applyPreset(id) {
 
 async function applyDefaultPresetOnStartup() {
   if (state.startupDefaultPresetApplied || !state.autoApplyDefaultPreset) return;
-  state.startupDefaultPresetApplied = true;
   const preset = state.presets.find((item) => item.id === DEFAULT_PRESET_ID);
-  if (!preset || Object.keys(preset.values || {}).length === 0) return;
+  if (!preset || Object.keys(preset.values || {}).length === 0) {
+    state.startupDefaultPresetApplied = true;
+    return;
+  }
+  const confirmed = await confirmDefaultPresetApply();
+  state.startupDefaultPresetApplied = true;
+  if (!confirmed) {
+    showMessage('Default preset skipped');
+    return;
+  }
   await applyPreset(DEFAULT_PRESET_ID);
+}
+
+function confirmDefaultPresetApply() {
+  if (!elements.defaultPresetDialog) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let settled = false;
+    function finish(value) {
+      if (settled) return;
+      settled = true;
+      elements.applyDefaultPresetButton.removeEventListener('click', onApply);
+      elements.skipDefaultPresetButton.removeEventListener('click', onSkip);
+      elements.defaultPresetDialog.removeEventListener('close', onClose);
+      resolve(value);
+    }
+    function onApply(event) {
+      event.preventDefault();
+      elements.defaultPresetDialog.close('yes');
+      finish(true);
+    }
+    function onSkip(event) {
+      event.preventDefault();
+      elements.defaultPresetDialog.close('no');
+      finish(false);
+    }
+    function onClose() {
+      finish(elements.defaultPresetDialog.returnValue === 'yes');
+    }
+    elements.applyDefaultPresetButton.addEventListener('click', onApply);
+    elements.skipDefaultPresetButton.addEventListener('click', onSkip);
+    elements.defaultPresetDialog.addEventListener('close', onClose);
+    elements.defaultPresetDialog.showModal();
+  });
 }
 
 function deletePreset(id) {
