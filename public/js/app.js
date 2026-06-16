@@ -757,7 +757,7 @@ function updateEnumControl(control, key) {
 function renderNumberControl(key, rule) {
   const min = rule.min ?? 0;
   const max = rule.max ?? 100;
-  const step = rule.type === 'integer' ? 1 : 0.01;
+  const step = Number(rule.step ?? rule.ui?.step ?? (rule.type === 'integer' ? 1 : 0.01));
   const value = Number(state.values[key] ?? min);
   const control = controlShell(key, `${min} bis ${max}`);
   control.dataset.kind = 'number';
