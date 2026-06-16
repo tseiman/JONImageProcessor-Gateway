@@ -83,7 +83,7 @@ const LABELS = {
   'pause.loopIfVideo': 'Loop Pause Video',
   'pause.showStatusText': 'Status Text',
   'pause.textColor': 'Text Color',
-  'pause.textSize': 'Text Size',
+  'pause.textSize': 'Text options',
   'pause.textPosition': 'Text Position',
   'pause.font': 'Font'
 };
@@ -274,6 +274,84 @@ function firstFiniteNumber(...values) {
     if (Number.isFinite(number)) return number;
   }
   return NaN;
+}
+
+function rangeText(min, max) {
+  return `${min}..${max}`;
+}
+
+function pictureDimensions() {
+  const positionRule = state.schema?.api?.commands?.set?.items?.['pause.textPosition'] || {};
+  const fallback = positionLimits(positionRule);
+  const fromResolution = readResolutionValue();
+  const width = firstFiniteNumber(
+    state.values['pause.picture.width'],
+    state.values['pause.pictureWidth'],
+    state.values['pause.image.width'],
+    state.values['pause.imageWidth'],
+    state.values['pause.width'],
+    state.values['image.width'],
+    state.values['picture.width'],
+    state.values['frame.width'],
+    state.values['video.width'],
+    state.values['input.width'],
+    state.values['output.width'],
+    state.values['display.width'],
+    state.values['screen.width'],
+    state.values['runtime.width'],
+    state.values['processing.width'],
+    fromResolution?.width,
+    fallback.x.max
+  );
+  const height = firstFiniteNumber(
+    state.values['pause.picture.height'],
+    state.values['pause.pictureHeight'],
+    state.values['pause.image.height'],
+    state.values['pause.imageHeight'],
+    state.values['pause.height'],
+    state.values['image.height'],
+    state.values['picture.height'],
+    state.values['frame.height'],
+    state.values['video.height'],
+    state.values['input.height'],
+    state.values['output.height'],
+    state.values['display.height'],
+    state.values['screen.height'],
+    state.values['runtime.height'],
+    state.values['processing.height'],
+    fromResolution?.height,
+    fallback.y.max
+  );
+  return {
+    width: Math.max(fallback.x.min, Math.round(width)),
+    height: Math.max(fallback.y.min, Math.round(height))
+  };
+}
+
+function readResolutionValue() {
+  const keys = [
+    'pause.picture.resolution',
+    'pause.resolution',
+    'image.resolution',
+    'picture.resolution',
+    'frame.resolution',
+    'video.resolution',
+    'input.resolution',
+    'output.resolution',
+    'display.resolution',
+    'screen.resolution',
+    'runtime.resolution',
+    'resolution'
+  ];
+  for (const key of keys) {
+    const match = String(state.values[key] || '').match(/(\d+)\s*x\s*(\d+)/i);
+    if (match) return { width: Number(match[1]), height: Number(match[2]) };
+  }
+  return null;
+}
+
+function pictureDimensionSignature(dimensions = pictureDimensions()) {
+  return `${dimensions.width}x${dimensions.height}`;
 }
 
 function sparklinePoints(values) {
@@ -696,8 +774,13 @@ function expandPatchKeys(keys) {
     expanded.push(key);
     if (key === 'background.overlayAlpha') expanded.push('background.overlayColor');
     if (key === 'pause.textPosition') expanded.push('pause.textSize');
+    if (isPictureDimensionKey(key)) expanded.push('pause.textSize');
   }
   return expanded;
+}
+
+function isPictureDimensionKey(key) {
+  return /(^|\.)(width|height|resolution|pictureWidth|pictureHeight|imageWidth|imageHeight)$/i.test(key);
 }
 
 function controlIsBusy(control, key) {
@@ -764,7 +847,7 @@ function renderNumberControl(key, rule) {
   const max = rule.max ?? 100;
   const step = numberStep(key, rule);
   const value = Number(state.values[key] ?? min);
-  const control = controlShell(key, `${min} bis ${max}`);
+  const control = controlShell(key, rangeText(min, max));
   control.dataset.kind = 'number';
   const wrap = document.createElement('div');
   wrap.className = 'knob-wrap';
@@ -803,7 +886,7 @@ function updateNumberControl(control, key) {
 
 function renderRgbControl(key) {
   const value = String(state.values[key] || '0,255,0').split(',').map((part) => Number(part));
-  const control = controlShell(key, '0 bis 255');
+  const control = controlShell(key, rangeText(0, 255));
   control.dataset.kind = 'rgb';
   const rgb = document.createElement('div');
   rgb.className = 'rgb';
@@ -865,7 +948,7 @@ function updateRgbControl(control, key) {
 
 function renderRgbaControl(key) {
   const value = parseRgbaHex(state.values[key]);
-  const control = controlShell(key, '0 bis 255');
+  const control = controlShell(key, rangeText(0, 255));
   control.dataset.kind = 'rgba';
   const rgba = document.createElement('div');
   rgba.className = 'rgba';
@@ -927,7 +1010,7 @@ function updateRgbaControl(control, key) {
 
 function renderOverlayRgbaControl(key) {
   const value = overlayRgbaValue();
-  const control = controlShell(key, '0 bis 255');
+  const control = controlShell(key, rangeText(0, 255));
   control.dataset.kind = 'overlay-rgba';
   const rgba = document.createElement('div');
   rgba.className = 'rgba';
@@ -1022,14 +1105,16 @@ function renderPauseTextLayoutControl(key, rule) {
     max: Number(rule.max ?? 10),
     step: rule.type === 'integer' ? 1 : 0.1
   };
-  const control = controlShell(key, `Size ${sizeLimits.min} bis ${sizeLimits.max}, X/Y`);
+  const dimensions = pictureDimensions();
+  const control = controlShell(key, `Size ${rangeText(sizeLimits.min, sizeLimits.max)}, X ${rangeText(limits.x.min, dimensions.width)}, Y ${rangeText(limits.y.min, dimensions.height)}`);
   control.dataset.kind = 'pause-text-layout';
+  control.dataset.dimensionSignature = pictureDimensionSignature(dimensions);
   const wrap = document.createElement('div');
   wrap.className = 'pause-text-knobs';
   const channels = [
     { key: 'pause.textSize', axis: 'size', label: 'Size', limits: sizeLimits, value: size },
-    { key: 'pause.textPosition', axis: 'x', label: 'X', limits: limits.x, value: position.x },
-    { key: 'pause.textPosition', axis: 'y', label: 'Y', limits: limits.y, value: position.y }
+    { key: 'pause.textPosition', axis: 'x', label: 'X', limits: { ...limits.x, max: dimensions.width }, value: position.x },
+    { key: 'pause.textPosition', axis: 'y', label: 'Y', limits: { ...limits.y, max: dimensions.height }, value: position.y }
   ];
 
   for (const channel of channels) {
@@ -1070,6 +1155,12 @@ function renderPauseTextLayoutControl(key, rule) {
 }
 
 function updatePauseTextLayoutControl(control) {
+  const dimensions = pictureDimensions();
+  if (control.dataset.dimensionSignature !== pictureDimensionSignature(dimensions)) {
+    const rule = state.schema?.api?.commands?.set?.items?.['pause.textSize'];
+    if (rule) control.replaceWith(renderPauseTextLayoutControl('pause.textSize', rule));
+    return;
+  }
   const position = parsePositionValue(state.values['pause.textPosition']);
   const values = {
     size: Number(state.values['pause.textSize']),
@@ -1099,7 +1190,7 @@ function pauseTextPositionValues(wrap) {
 function renderPositionControl(key, rule) {
   const limits = positionLimits(rule);
   const value = parsePositionValue(state.values[key]);
-  const control = controlShell(key, `${limits.x.min} bis ${limits.x.max}, ${limits.y.min} bis ${limits.y.max}`);
+  const control = controlShell(key, `${rangeText(limits.x.min, limits.x.max)}, ${rangeText(limits.y.min, limits.y.max)}`);
   control.dataset.kind = 'position';
   const wrap = document.createElement('div');
   wrap.className = 'position-knobs';
