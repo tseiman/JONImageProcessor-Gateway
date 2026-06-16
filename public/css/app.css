@@ -174,9 +174,10 @@ button, input, select {
 
 .preset-item {
   display: grid;
-  grid-template-columns: 1fr 34px 34px;
+  grid-template-columns: 1fr 34px;
   gap: 6px;
   align-items: center;
+  position: relative;
 }
 
 .preset-item .preset-button {
@@ -191,6 +192,64 @@ button, input, select {
   height: 34px;
   margin: 0;
   font-size: 15px;
+}
+
+.preset-menu-wrap {
+  position: relative;
+}
+
+.preset-menu-button {
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.preset-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 150px;
+  padding: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 24px var(--shadow);
+}
+
+.preset-menu-item {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.preset-menu-item:hover {
+  background: #303846;
+}
+
+.preset-menu-item svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.preset-menu-item b {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .preset-tools {

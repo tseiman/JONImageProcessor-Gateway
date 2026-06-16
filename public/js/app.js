@@ -509,23 +509,66 @@ function renderPresets() {
     applyButton.title = preset.name;
     applyButton.addEventListener('click', () => applyPreset(preset.id));
 
-    const exportButton = document.createElement('button');
-    exportButton.className = 'icon-button';
-    exportButton.title = 'Export preset';
-    exportButton.setAttribute('aria-label', `Export preset ${preset.name}`);
-    exportButton.textContent = '⇩';
-    exportButton.addEventListener('click', () => exportPreset(preset));
+    const menuWrap = document.createElement('div');
+    menuWrap.className = 'preset-menu-wrap';
 
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'icon-button';
-    deleteButton.title = 'Delete preset';
-    deleteButton.setAttribute('aria-label', `Delete preset ${preset.name}`);
-    deleteButton.textContent = '×';
-    deleteButton.addEventListener('click', () => deletePreset(preset.id));
+    const menuButton = document.createElement('button');
+    menuButton.className = 'icon-button preset-menu-button';
+    menuButton.title = 'Preset actions';
+    menuButton.setAttribute('aria-label', `Preset actions for ${preset.name}`);
+    menuButton.textContent = '...';
 
-    item.append(applyButton, exportButton, deleteButton);
+    const menu = document.createElement('div');
+    menu.className = 'preset-menu';
+    menu.hidden = true;
+    menu.append(
+      presetMenuItem(iconSvg('edit'), 'Update', () => updatePreset(preset.id)),
+      presetMenuItem(iconSvg('download'), 'Download', () => exportPreset(preset)),
+      presetMenuItem(iconSvg('trash'), 'Delete', () => deletePreset(preset.id))
+    );
+
+    menuButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closePresetMenus(menuWrap);
+      menu.hidden = !menu.hidden;
+    });
+
+    menuWrap.append(menuButton, menu);
+    item.append(applyButton, menuWrap);
     elements.presetList.appendChild(item);
   }
+}
+
+function presetMenuItem(icon, label, handler) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'preset-menu-item';
+  button.innerHTML = `<span>${icon}</span><b>${label}</b>`;
+  button.addEventListener('click', () => {
+    closePresetMenus();
+    handler();
+  });
+  return button;
+}
+
+function iconSvg(name) {
+  const attrs = 'viewBox="0 0 24 24" aria-hidden="true"';
+  if (name === 'edit') {
+    return `<svg ${attrs}><path d="M4 20h4l11-11-4-4L4 16v4z"></path><path d="M13 7l4 4"></path></svg>`;
+  }
+  if (name === 'download') {
+    return `<svg ${attrs}><path d="M12 4v11"></path><path d="M7 10l5 5 5-5"></path><path d="M5 20h14"></path></svg>`;
+  }
+  return `<svg ${attrs}><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>`;
+}
+
+function closePresetMenus(except) {
+  document.querySelectorAll('.preset-menu-wrap').forEach((wrap) => {
+    if (wrap !== except) {
+      const menu = wrap.querySelector('.preset-menu');
+      if (menu) menu.hidden = true;
+    }
+  });
 }
 
 function currentPresetValues() {
@@ -572,6 +615,22 @@ function savePreset(name) {
   writePresets();
   renderPresets();
   showMessage(`Saved preset ${trimmedName}`);
+  return true;
+}
+
+function updatePreset(id) {
+  const preset = state.presets.find((item) => item.id === id);
+  if (!preset) return false;
+  const values = currentPresetValues();
+  if (Object.keys(values).length === 0) {
+    showMessage('No settings loaded for preset', true);
+    return false;
+  }
+  preset.values = values;
+  preset.updatedAt = new Date().toISOString();
+  writePresets();
+  renderPresets();
+  showMessage(`Updated preset ${preset.name}`);
   return true;
 }
 
@@ -1876,6 +1935,14 @@ elements.refreshButton.addEventListener('click', () => refresh());
 
 document.addEventListener('click', (event) => {
   if (!event.target.closest('.asset-picker')) closeAssetMenus();
+  if (!event.target.closest('.preset-menu-wrap')) closePresetMenus();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeAssetMenus();
+    closePresetMenus();
+  }
 });
 
 elements.showTokenInput.addEventListener('change', () => {
