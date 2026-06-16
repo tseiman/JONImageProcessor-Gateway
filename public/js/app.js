@@ -201,9 +201,11 @@ function updateBenchmark(benchmark) {
   const fps = readFpsValue(benchmark);
   const label = elements.fpsStatus.querySelector('.fps-label');
   const polyline = elements.fpsStatus.querySelector('polyline');
+  const polygon = elements.fpsStatus.querySelector('polygon');
   if (!Number.isFinite(fps)) {
     if (label) label.textContent = 'FPS --';
     if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
     return;
   }
 
@@ -214,6 +216,7 @@ function updateBenchmark(benchmark) {
   if (state.fpsHistory.length > 32) state.fpsHistory.shift();
   if (label) label.textContent = `FPS ${fps.toFixed(1)}`;
   if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
+  if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
 }
 
 function readFpsValue(benchmark) {
@@ -270,17 +273,25 @@ function firstFiniteNumber(...values) {
 
 function sparklinePoints(values) {
   if (!values.length) return '';
-  if (values.length === 1) return `0,7 40,7`;
+  return sparklineCoordinates(values).join(' ');
+}
+
+function sparklineAreaPoints(values) {
+  if (!values.length) return '';
+  const line = sparklineCoordinates(values);
+  return `0,14 ${line.join(' ')} 40,14`;
+}
+
+function sparklineCoordinates(values) {
   const width = 40;
   const height = 14;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(1, max - min);
-  return values.map((value, index) => {
-    const x = (index / (values.length - 1)) * width;
-    const y = height - (((value - min) / range) * (height - 2)) - 1;
+  const maxFps = 20;
+  const plottedValues = values.length === 1 ? [values[0], values[0]] : values;
+  return plottedValues.map((value, index) => {
+    const x = (index / (plottedValues.length - 1)) * width;
+    const y = height - ((clamp(value, 0, maxFps) / maxFps) * (height - 2)) - 1;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+  });
 }
 
 function updateVersion(version) {
@@ -437,9 +448,14 @@ function currentPresetValues() {
   const items = state.schema?.api?.commands?.set?.items || {};
   const values = {};
   for (const key of Object.keys(items)) {
-    if (state.values[key] !== undefined) values[key] = state.values[key];
+    if (state.values[key] !== undefined) values[key] = normalizePresetValue(key, state.values[key], items[key]);
   }
   return values;
+}
+
+function normalizePresetValue(key, value, rule) {
+  if (rule?.assetRoot || key.endsWith('.image')) return assetIdFromValue(value);
+  return value;
 }
 
 function savePreset(name) {
@@ -479,18 +495,20 @@ async function applyPreset(id) {
   const preset = state.presets.find((item) => item.id === id);
   if (!preset) return;
   const items = state.schema?.api?.commands?.set?.items || {};
-  const entries = Object.entries(preset.values || {}).filter(([key, value]) => items[key] && value !== undefined);
+  const entries = Object.entries(preset.values || {})
+    .filter(([key, value]) => items[key] && value !== undefined)
+    .map(([key, value]) => [key, normalizePresetValue(key, value, items[key])]);
   if (entries.length === 0) {
     showMessage('Preset has no settings', true);
     return;
   }
 
-  let failed = 0;
+  const failed = [];
   for (const [key, value] of entries) {
-    if (!await setValue(key, value)) failed += 1;
+    if (!await setValue(key, value)) failed.push(LABELS[key] || key);
   }
-  if (failed > 0) {
-    showMessage(`Applied preset ${preset.name} with ${failed} failed setting${failed === 1 ? '' : 's'}`, true);
+  if (failed.length > 0) {
+    showMessage(`Applied preset ${preset.name}; failed: ${failed.join(', ')}`, true);
   } else {
     showMessage(`Applied preset ${preset.name}`);
   }
