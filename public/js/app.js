@@ -5,12 +5,16 @@ const AUTO_APPLY_DEFAULT_PRESET_KEY = 'jonGatewayAutoApplyDefaultPreset';
 const DEFAULT_PRESET_ID = 'default';
 const DEFAULT_PRESET_NAME = 'Default';
 const DEFAULT_CONFIRM_TIMEOUT_MS = 2500;
+const DEFAULT_PRESET_RECONNECT_PROMPT_MS = 30000;
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || '',
   confirmTimeoutMs: readConfirmTimeout(),
   autoApplyDefaultPreset: readAutoApplyDefaultPreset(),
   startupDefaultPresetApplied: false,
+  defaultPresetPromptOpen: false,
+  connectionUiConnected: false,
+  disconnectedAtMs: null,
   schema: null,
   values: {},
   fpsHistory: [],
@@ -157,8 +161,18 @@ function readAutoApplyDefaultPreset() {
 }
 
 function setConnected(connected) {
+  const wasConnected = state.connectionUiConnected;
+  state.connectionUiConnected = connected;
   elements.connectionStatus.textContent = connected ? '● Connected' : '● Disconnected';
   elements.connectionStatus.classList.toggle('connected', connected);
+  if (!connected) {
+    if (wasConnected && state.disconnectedAtMs === null) state.disconnectedAtMs = performance.now();
+    return;
+  }
+  const disconnectedForMs = state.disconnectedAtMs === null ? 0 : performance.now() - state.disconnectedAtMs;
+  state.disconnectedAtMs = null;
+  if (wasConnected || disconnectedForMs < DEFAULT_PRESET_RECONNECT_PROMPT_MS || !state.startupDefaultPresetApplied) return;
+  confirmAndApplyDefaultPreset();
 }
 
 async function loadSchema() {
@@ -740,13 +754,17 @@ async function applyPreset(id) {
 
 async function applyDefaultPresetOnStartup() {
   if (state.startupDefaultPresetApplied || !state.autoApplyDefaultPreset) return;
-  const preset = state.presets.find((item) => item.id === DEFAULT_PRESET_ID);
-  if (!preset || Object.keys(preset.values || {}).length === 0) {
-    state.startupDefaultPresetApplied = true;
-    return;
-  }
-  const confirmed = await confirmDefaultPresetApply();
   state.startupDefaultPresetApplied = true;
+  await confirmAndApplyDefaultPreset();
+}
+
+async function confirmAndApplyDefaultPreset() {
+  if (!state.autoApplyDefaultPreset || state.defaultPresetPromptOpen) return;
+  const preset = state.presets.find((item) => item.id === DEFAULT_PRESET_ID);
+  if (!preset || Object.keys(preset.values || {}).length === 0) return;
+  state.defaultPresetPromptOpen = true;
+  const confirmed = await confirmDefaultPresetApply();
+  state.defaultPresetPromptOpen = false;
   if (!confirmed) {
     showMessage('Default preset skipped');
     return;
