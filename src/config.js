@@ -72,7 +72,9 @@ export function publicConfig(config) {
           allowUpload: Boolean(root.allowUpload),
           allowDelete: Boolean(root.allowDelete),
           allowedExtensions: root.allowedExtensions ?? [],
-          ipcKey: root.ipcKey
+          ipcKey: root.ipcKey,
+          kind: root.kind,
+          fileType: root.fileType
         }
       ]))
     },

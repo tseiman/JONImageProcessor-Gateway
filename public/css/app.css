@@ -309,6 +309,37 @@ button:disabled {
   background: var(--blue);
 }
 
+.font-align button {
+  display: grid;
+  place-items: center;
+}
+
+.align-icon {
+  width: 28px;
+  height: 18px;
+  display: grid;
+  align-content: space-between;
+}
+
+.align-icon i {
+  display: block;
+  height: 3px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
+.align-icon.left i {
+  justify-self: start;
+}
+
+.align-icon.center i {
+  justify-self: center;
+}
+
+.align-icon.right i {
+  justify-self: end;
+}
+
 .knob-wrap {
   display: grid;
   place-items: center;

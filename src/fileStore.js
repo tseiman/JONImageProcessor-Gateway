@@ -9,6 +9,7 @@ const ALLOWED_TYPES = new Set(['Image', 'Video', 'HTML App']);
 
 export async function listFiles(rootName, config) {
   const root = rootConfig(rootName, config);
+  if (root.kind === 'file') return listFlatFiles(rootName, root);
   log('info', 'Listing asset root', { rootName, rootPath: root.path });
   const entries = await fs.promises.readdir(root.path, { withFileTypes: true }).catch((error) => {
     if (error.code === 'ENOENT') {
@@ -38,6 +39,7 @@ export async function listFiles(rootName, config) {
 export async function uploadFile(req, rootName, fileName, config) {
   const root = rootConfig(rootName, config);
   if (!root.allowUpload) throw httpError(403, 'Uploads are disabled for this root.');
+  if (root.kind === 'file') return uploadFlatFile(req, rootName, fileName, root, config);
   validateZipName(fileName);
   const contentLength = Number(req.headers['content-length'] ?? 0);
   if (!Number.isFinite(contentLength) || contentLength <= 0) throw httpError(411, 'Content-Length is required.');
@@ -96,6 +98,7 @@ export async function uploadFile(req, rootName, fileName, config) {
 export async function deleteFile(rootName, assetName, config) {
   const root = rootConfig(rootName, config);
   if (!root.allowDelete) throw httpError(403, 'Deletes are disabled for this root.');
+  if (root.kind === 'file') return deleteFlatFile(rootName, assetName, root);
   const target = resolvePackageTarget(root, assetName);
   log('warn', 'Deleting asset directory', { rootName, assetName, target });
   await fs.promises.rm(target, { recursive: true, force: false });
@@ -133,6 +136,103 @@ function rootConfig(rootName, config) {
   const root = config.files.roots[rootName];
   if (!root) throw httpError(404, `Unknown file root: ${rootName}`);
   return root;
+}
+
+async function listFlatFiles(rootName, root) {
+  log('info', 'Listing file root', { rootName, rootPath: root.path });
+  const entries = await fs.promises.readdir(root.path, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') {
+      log('warn', 'File root does not exist; returning empty list', { rootName, rootPath: root.path });
+      return [];
+    }
+    throw error;
+  });
+  const allowed = allowedExtensions(root);
+  const files = await Promise.all(entries
+    .filter((entry) => entry.isFile() && allowed.has(path.extname(entry.name).toLowerCase()))
+    .map(async (entry) => {
+      const fullPath = path.join(root.path, entry.name);
+      const stat = await fs.promises.stat(fullPath);
+      const id = path.basename(entry.name, path.extname(entry.name));
+      return {
+        id,
+        name: id,
+        version: '',
+        description: entry.name,
+        type: root.fileType || 'File',
+        mtime: stat.mtime.toISOString()
+      };
+    }));
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function uploadFlatFile(req, rootName, fileName, root, config) {
+  validateFlatFileName(fileName, root);
+  const contentLength = Number(req.headers['content-length'] ?? 0);
+  if (!Number.isFinite(contentLength) || contentLength <= 0) throw httpError(411, 'Content-Length is required.');
+  if (contentLength > config.files.maxUploadBytes) throw httpError(413, 'Upload exceeds maxUploadBytes.');
+
+  await fs.promises.mkdir(root.path, { recursive: true });
+  const target = resolveFlatFileTarget(root, fileName);
+  log('info', 'File upload started', { rootName, rootPath: root.path, fileName, contentLength, target });
+
+  let received = 0;
+  req.on('data', (chunk) => {
+    received += chunk.length;
+    if (received > config.files.maxUploadBytes) req.destroy(httpError(413, 'Upload exceeds maxUploadBytes.'));
+  });
+
+  await pipeline(req, fs.createWriteStream(target, { flags: 'w' }));
+  const stat = await fs.promises.stat(target);
+  const id = path.basename(fileName, path.extname(fileName));
+  log('info', 'File upload completed', { rootName, rootPath: root.path, fileName, target });
+  return {
+    id,
+    name: id,
+    version: '',
+    description: fileName,
+    type: root.fileType || 'File',
+    mtime: stat.mtime.toISOString()
+  };
+}
+
+async function deleteFlatFile(rootName, assetName, root) {
+  const target = resolveFlatFileTarget(root, flatFileNameFromAssetName(assetName, root));
+  log('warn', 'Deleting file', { rootName, assetName, target });
+  await fs.promises.rm(target, { force: false });
+  return { deleted: path.basename(target, path.extname(target)) };
+}
+
+function resolveFlatFileTarget(root, fileName) {
+  validateFlatFileName(fileName, root);
+  const base = path.resolve(root.path);
+  const target = path.resolve(base, fileName);
+  if (!target.startsWith(`${base}${path.sep}`)) throw httpError(400, 'File path escapes the configured root.');
+  return target;
+}
+
+function validateFlatFileName(fileName, root) {
+  if (!fileName || fileName.includes('/') || fileName.includes('\\')) throw httpError(400, 'Invalid file name.');
+  const extension = path.extname(fileName).toLowerCase();
+  if (!allowedExtensions(root).has(extension)) {
+    throw httpError(415, `Only ${[...allowedExtensions(root)].join(', ')} files are allowed.`);
+  }
+  validateAssetName(path.basename(fileName, extension));
+}
+
+function flatFileNameFromAssetName(assetName, root) {
+  const extension = path.extname(assetName).toLowerCase();
+  if (extension) {
+    validateFlatFileName(assetName, root);
+    return assetName;
+  }
+  validateAssetName(assetName);
+  const [firstExtension] = [...allowedExtensions(root)];
+  return `${assetName}${firstExtension}`;
+}
+
+function allowedExtensions(root) {
+  return new Set((root.allowedExtensions || []).map((extension) => extension.toLowerCase()));
 }
 
 function resolvePackageTarget(root, assetName) {

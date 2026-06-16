@@ -73,12 +73,12 @@ The important settings are:
 - `server.corsAllowedOrigins`: optional list of browser origins allowed to call the API from another site. Use the future local WebUI from the same origin when possible.
 - `jonImageProcessor.ipcSocket`: Unix socket exposed by `JONImageProcessor`.
 - `jonImageProcessor.pollIntervalMs`: interval for polling `list` from the Unix socket and broadcasting state to WebUI clients over WebSocket.
-- `files.roots`: named upload/delete roots, for example `backgrounds` and `pause`.
+- `files.roots`: named upload/delete roots, for example `backgrounds`, `pause`, and `fonts`.
 - `api.commands`: allowed `list`, `get`, and `set` IPC operations plus value validation for each writable key.
 
 The config is also intended as the future WebUI schema. `/api/schema` returns the allowed API shape without secrets.
 
-Media assets are uploaded as ZIP packages only. Each ZIP must contain exactly one top-level directory. That directory must contain an `info.json` file with:
+Media assets for `backgrounds` and `pause` are uploaded as ZIP packages only. Each ZIP must contain exactly one top-level directory. That directory must contain an `info.json` file with:
 
 ```json
 {
@@ -90,7 +90,9 @@ Media assets are uploaded as ZIP packages only. Each ZIP must contain exactly on
 }
 ```
 
-Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is accepted as an alias for `startFile`. The ZIP is unpacked into the configured root as its own asset directory, for example `/opt/JONImageProcessor/backgrounds/studio-background/info.json`.
+Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is accepted as an alias for `startFile`. The ZIP is unpacked into the configured root as its own asset directory, for example `/opt/JONImageProcessor/var/userdata/background/studio-background/info.json`.
+
+TTF pause text fonts use the separate `fonts` file root. Upload plain `.ttf` files there; the WebUI lists them together with the built-in OpenCV Hershey fonts. When `pause.font` is set to `Inter-Regular`, JONImageProcessor loads `Inter-Regular.ttf` from the read-only IPC value `pause.fontDirectory`. On the Jetson deployment this directory should match the gateway `files.roots.fonts.path`, for example `/opt/JONImageProcessor/var/userdata/fonts`.
 
 A complete image asset example is available in `examples/assets/sample-background/`. See `examples/README.md` for ZIP and upload commands.
 
@@ -215,6 +217,22 @@ curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
 ```
 
 When a client sets `background.image` or `pause.image`, it sends the asset id, for example `studio-background`. The gateway reads that asset's `info.json`, resolves `startFile`, and forwards the relative package path such as `studio-background/background.jpg` to the `JONImageProcessor` Unix socket API.
+
+List, upload, and delete TTF pause fonts:
+
+```bash
+curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/files/fonts
+
+curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  --data-binary @Inter-Regular.ttf \
+  http://127.0.0.1:8080/api/files/fonts/Inter-Regular.ttf
+
+curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/files/fonts/Inter-Regular
+```
+
+For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`.
 
 ## WebSocket API
 

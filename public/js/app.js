@@ -61,7 +61,7 @@ const STAGES = [
   },
   {
     title: 'PAUSE',
-    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font']
+    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font', 'pause.fontAlign']
   }
 ];
 
@@ -85,11 +85,12 @@ const LABELS = {
   'pause.textColor': 'Text Color',
   'pause.textSize': 'Text options',
   'pause.textPosition': 'Text Position',
-  'pause.font': 'Font'
+  'pause.font': 'Font',
+  'pause.fontAlign': 'Font align'
 };
 
 const BOOLEAN_INVERTED = new Set(['runtime.noMask', 'runtime.noOverlay']);
-const SELECT_ENUM_KEYS = new Set(['pause.font']);
+const SELECT_ENUM_KEYS = new Set();
 
 function authHeaders(extra = {}) {
   return {
@@ -703,6 +704,8 @@ function render() {
 }
 
 function renderControl(key, rule) {
+  if (key === 'pause.font') return renderFontControl(key, rule);
+  if (key === 'pause.fontAlign') return renderFontAlignControl(key, rule);
   if (rule.assetRoot) return renderAssetControl(key, rule);
   if (rule.type === 'boolean') return renderBooleanControl(key);
   if (SELECT_ENUM_KEYS.has(key)) return renderSelectEnumControl(key, rule);
@@ -756,6 +759,7 @@ function patchControls(keys) {
     const kind = control.dataset.kind;
     if (kind === 'boolean') updateBooleanControl(control, key);
     else if (kind === 'enum') updateEnumControl(control, key);
+    else if (kind === 'font-align') updateFontAlignControl(control, key);
     else if (kind === 'select-enum') updateSelectEnumControl(control, key);
     else if (kind === 'number') updateNumberControl(control, key);
     else if (kind === 'rgb') updateRgbControl(control, key);
@@ -763,6 +767,7 @@ function patchControls(keys) {
     else if (kind === 'overlay-rgba') updateOverlayRgbaControl(control);
     else if (kind === 'position') updatePositionControl(control, key);
     else if (kind === 'pause-text-layout') updatePauseTextLayoutControl(control);
+    else if (kind === 'font') updateFontControl(control, key);
     else if (kind === 'asset') updateAssetControl(control, key);
     else if (kind === 'text') updateTextControl(control, key);
   }
@@ -774,6 +779,7 @@ function expandPatchKeys(keys) {
     expanded.push(key);
     if (key === 'background.overlayAlpha') expanded.push('background.overlayColor');
     if (key === 'pause.textPosition') expanded.push('pause.textSize');
+    if (key === 'pause.fontDirectory') expanded.push('pause.font');
     if (isPictureDimensionKey(key)) expanded.push('pause.textSize');
   }
   return expanded;
@@ -840,6 +846,37 @@ function updateEnumControl(control, key) {
   control.querySelectorAll('button[data-value]').forEach((button) => {
     button.classList.toggle('active', button.dataset.value === value);
   });
+}
+
+function renderFontAlignControl(key, rule) {
+  const control = controlShell(key);
+  control.dataset.kind = 'font-align';
+  const group = document.createElement('div');
+  group.className = 'enum font-align';
+  for (const option of rule.enum || ['left', 'center', 'right']) {
+    const button = document.createElement('button');
+    button.dataset.value = option;
+    button.title = title(option);
+    button.innerHTML = alignIconHtml(option);
+    button.classList.toggle('active', state.values[key] === option);
+    button.addEventListener('click', () => setValue(key, option));
+    group.appendChild(button);
+  }
+  control.appendChild(group);
+  return control;
+}
+
+function updateFontAlignControl(control, key) {
+  updateEnumControl(control, key);
+}
+
+function alignIconHtml(option) {
+  const rows = {
+    left: ['100%', '72%', '88%'],
+    center: ['86%', '100%', '68%'],
+    right: ['100%', '72%', '88%']
+  }[option] || ['100%', '100%', '100%'];
+  return `<span class="align-icon ${escapeHtml(option)}">${rows.map((width) => `<i style="width:${width}"></i>`).join('')}</span>`;
 }
 
 function renderNumberControl(key, rule) {
@@ -1279,6 +1316,158 @@ function updateTextControl(control, key) {
   if (input && document.activeElement !== input) input.value = state.values[key] || '';
 }
 
+function renderFontControl(key, rule) {
+  const control = controlShell(key);
+  control.dataset.kind = 'font';
+  const root = rule.ui?.fontRoot || 'fonts';
+  const row = document.createElement('div');
+  row.className = 'asset-row';
+  const picker = buildFontPicker(control, root, state.values[key] || '', (fontId) => {
+    updateFontDetail(control, root, fontId);
+    if (fontId) setValue(key, fontId);
+  }, rule);
+  const deleteButton = document.createElement('button');
+  deleteButton.className = 'action';
+  deleteButton.textContent = 'Delete';
+  deleteButton.disabled = !isUploadedFont(root, state.values[key]);
+  deleteButton.addEventListener('click', () => deleteAsset(root, state.values[key]));
+  row.append(picker, deleteButton);
+
+  const upload = document.createElement('div');
+  upload.className = 'upload-row';
+  const file = document.createElement('input');
+  file.type = 'file';
+  file.accept = '.ttf,font/ttf,application/x-font-ttf';
+  file.className = 'hidden-file';
+  file.addEventListener('change', () => {
+    uploadAsset(root, file.files[0]).finally(() => {
+      file.value = '';
+    });
+  });
+  const uploadButton = document.createElement('button');
+  uploadButton.className = 'action upload-button';
+  uploadButton.textContent = 'Upload TTF';
+  uploadButton.addEventListener('click', () => file.click());
+  upload.append(file, uploadButton);
+
+  const detail = document.createElement('div');
+  detail.className = 'asset-detail';
+  control.append(row, detail, upload);
+  updateFontDetail(control, root, state.values[key] || '');
+  return control;
+}
+
+function updateFontControl(control, key) {
+  const root = state.schema?.api?.commands?.set?.items?.[key]?.ui?.fontRoot || 'fonts';
+  setFontSelection(control, root, state.values[key] || '');
+  const deleteButton = control.querySelector('button.action');
+  if (deleteButton) deleteButton.disabled = !isUploadedFont(root, state.values[key]);
+  updateFontDetail(control, root, state.values[key] || '');
+}
+
+function buildFontPicker(control, root, selectedFont, onSelect, rule) {
+  const picker = document.createElement('div');
+  picker.className = 'asset-picker';
+  picker.dataset.root = root;
+  picker.dataset.selected = selectedFont || '';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'asset-picker-button';
+  const menu = document.createElement('div');
+  menu.className = 'asset-menu';
+  menu.hidden = true;
+
+  const fonts = fontOptions(root, rule);
+  for (const font of fonts) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'asset-option';
+    option.dataset.fontId = font.id;
+    option.innerHTML = fontOptionHtml(font);
+    option.addEventListener('click', () => {
+      setFontSelectionElement(picker, root, font.id);
+      menu.hidden = true;
+      onSelect(font.id);
+    });
+    menu.appendChild(option);
+  }
+
+  button.addEventListener('click', () => {
+    closeAssetMenus(picker);
+    menu.hidden = !menu.hidden;
+  });
+
+  picker.append(button, menu);
+  setFontSelectionElement(picker, root, selectedFont, rule);
+  return picker;
+}
+
+function fontOptions(root, rule = {}) {
+  const builtinFonts = rule.ui?.builtinFonts || rule.enum || [];
+  const options = builtinFonts.map((font) => ({
+    id: font,
+    name: title(font),
+    description: 'Built-in OpenCV Hershey font',
+    type: 'Built-in'
+  }));
+  for (const font of state.assets[root] || []) {
+    options.push({
+      id: font.id,
+      name: font.name,
+      description: font.description || `${font.id}.ttf`,
+      type: font.type || 'TTF Font'
+    });
+  }
+  const current = state.values['pause.font'];
+  if (current && !options.some((font) => font.id === current)) {
+    options.push({
+      id: current,
+      name: current,
+      description: 'Current IPC value',
+      type: 'Unknown'
+    });
+  }
+  return options;
+}
+
+function setFontSelection(control, root, fontId) {
+  const picker = control.querySelector('.asset-picker');
+  if (picker) setFontSelectionElement(picker, root, fontId);
+}
+
+function setFontSelectionElement(picker, root, fontId, rule = state.schema?.api?.commands?.set?.items?.['pause.font'] || {}) {
+  const font = fontOptions(root, rule).find((item) => item.id === fontId);
+  picker.dataset.selected = font?.id || '';
+  const button = picker.querySelector('.asset-picker-button');
+  if (button) {
+    button.innerHTML = font ? fontOptionHtml(font) : '<b>Select font</b><span>No font selected</span>';
+  }
+  picker.querySelectorAll('.asset-option').forEach((option) => {
+    option.classList.toggle('active', option.dataset.fontId === picker.dataset.selected);
+  });
+}
+
+function fontOptionHtml(font) {
+  return `<b>${escapeHtml(font.name)} (${escapeHtml(font.type)})</b><span>${escapeHtml(font.description || '')}</span>`;
+}
+
+function updateFontDetail(control, root, fontId) {
+  const detail = control.querySelector('.asset-detail');
+  if (!detail) return;
+  const font = fontOptions(root).find((item) => item.id === fontId);
+  const directory = state.values['pause.fontDirectory'];
+  if (!font) {
+    detail.innerHTML = `<span>${directory ? `Directory: ${escapeHtml(directory)}` : 'No font selected'}</span>`;
+    return;
+  }
+  detail.innerHTML = `${fontOptionHtml(font)}${directory ? `<span>Directory: ${escapeHtml(directory)}</span>` : ''}`;
+}
+
+function isUploadedFont(root, fontId) {
+  return Boolean(fontId && (state.assets[root] || []).some((font) => font.id === fontId));
+}
+
 function renderAssetControl(key, rule) {
   const control = controlShell(key);
   control.dataset.kind = 'asset';
@@ -1335,7 +1524,8 @@ function refreshAssetControls(roots) {
   const rootSet = new Set(roots);
   const items = state.schema?.api?.commands?.set?.items || {};
   for (const [key, rule] of Object.entries(items)) {
-    if (!rule.assetRoot || !rootSet.has(rule.assetRoot)) continue;
+    const rootsForControl = [rule.assetRoot, rule.ui?.fontRoot].filter(Boolean);
+    if (!rootsForControl.some((root) => rootSet.has(root))) continue;
     const control = document.querySelector(`.control[data-key="${cssEscape(key)}"]`);
     if (!control) continue;
     control.replaceWith(renderControl(key, rule));
@@ -1481,7 +1671,7 @@ async function setValue(key, value) {
 
 async function uploadAsset(root, file) {
   if (!file) {
-    showMessage('Select a ZIP file first', true);
+    showMessage(`Select a ${uploadExtensionText(root)} file first`, true);
     return;
   }
   try {
@@ -1497,6 +1687,10 @@ async function uploadAsset(root, file) {
   } catch (error) {
     showMessage(error.message, true);
   }
+}
+
+function uploadExtensionText(root) {
+  return (state.schema?.files?.roots?.[root]?.allowedExtensions || ['file']).join('/');
 }
 
 async function deleteAsset(root, assetId) {
