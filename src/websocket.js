@@ -32,7 +32,7 @@ export function handleUpgrade(req, socket, head, config) {
   if (!isAuthorized(token, config)) {
     log('warn', 'Rejected unauthorized WebSocket upgrade', {
       path: url.pathname,
-      remoteAddress: req.socket.remoteAddress
+      remoteAddress: req.socket?.remoteAddress || req.connection?.remoteAddress || null
     });
     socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
     socket.destroy();

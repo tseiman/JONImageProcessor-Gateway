@@ -135,7 +135,7 @@ server.on('upgrade', (req, socket, head) => {
   log('info', 'WebSocket upgrade requested', {
     method: req.method,
     path: url.pathname,
-    remoteAddress: req.socket.remoteAddress
+    remoteAddress: remoteAddress(req)
   });
   handleUpgrade(req, socket, head, config);
 });
@@ -206,10 +206,14 @@ function requestLogFields(req, url, requestId) {
     requestId,
     method: req.method,
     path: url.pathname,
-    remoteAddress: req.socket.remoteAddress,
+    remoteAddress: remoteAddress(req),
     userAgent: req.headers['user-agent'],
     contentLength: req.headers['content-length']
   };
+}
+
+function remoteAddress(req) {
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || null;
 }
 
 async function serveStatic(requestPath, res) {
