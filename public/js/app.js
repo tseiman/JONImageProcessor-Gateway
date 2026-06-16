@@ -10,6 +10,7 @@ const state = {
   values: {},
   fpsHistory: [],
   lastFpsPaintMs: 0,
+  lastFpsGraphSampleMs: 0,
   presets: readPresets(),
   assets: { backgrounds: [], pause: [] },
   pending: {},
@@ -212,11 +213,15 @@ function updateBenchmark(benchmark) {
   const now = performance.now();
   if (state.fpsHistory.length > 0 && now - state.lastFpsPaintMs < 900) return;
   state.lastFpsPaintMs = now;
-  state.fpsHistory.push(fps);
-  if (state.fpsHistory.length > 32) state.fpsHistory.shift();
   if (label) label.textContent = `FPS ${fps.toFixed(1)}`;
-  if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
-  if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
+
+  if (state.fpsHistory.length === 0 || now - state.lastFpsGraphSampleMs >= 2700) {
+    state.lastFpsGraphSampleMs = now;
+    state.fpsHistory.push(fps);
+    if (state.fpsHistory.length > 32) state.fpsHistory.shift();
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
+  }
 }
 
 function readFpsValue(benchmark) {

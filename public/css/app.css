@@ -87,7 +87,7 @@ button, input, select {
 }
 
 .fps-sparkline polygon {
-  fill: rgba(56, 216, 120, 0.2);
+  fill: rgba(56, 216, 120, 0.4);
 }
 
 .fps-sparkline polyline {
