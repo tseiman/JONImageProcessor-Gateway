@@ -149,11 +149,11 @@ http://127.0.0.1:8080/
 
 The UI stores the API token in browser local storage and uses the same HTTP JSON API documented below.
 
-The top status row shows the gateway Git hash from `src/version-info.json`. If that commit was exactly on a release tag when `npm run version:write` was executed, the release tag is shown as well. The running service never calls `git`. As an emergency override, set `JON_GATEWAY_GIT_HASH` and optionally `JON_GATEWAY_RELEASE_TAG` in `/opt/JONImageProcessor-Gateway/etc/token.env`.
+The top status row shows the gateway Git hash from `src/version-info.json`. If that commit was exactly on a release tag when `npm run version:write` was executed, the release tag is shown as well. The same row also shows the JONImageProcessor version from IPC `system.version` or `version` when the current processor reports it. The running service never calls `git`. As an emergency override, set `JON_GATEWAY_GIT_HASH` and optionally `JON_GATEWAY_RELEASE_TAG` in `/opt/JONImageProcessor-Gateway/etc/token.env`.
 
 The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value. The browser-side confirmation timeout is configurable in the WebUI settings dialog.
 
-WebUI presets are stored locally in the browser. `Save Preset` stores the current settable values from the gateway schema, clicking a preset sends those values back to the gateway, and the preset list provides delete and JSON export. The preset section also supports JSON import/export for moving browser-local presets between systems.
+WebUI presets are stored locally in the browser. `Save Preset` stores the current settable values from the gateway schema, clicking a preset sends those values back to the gateway, and the preset action menu provides update, JSON export, and delete. The protected `Default` preset can only be updated and is applied automatically when the WebUI starts unless that option is disabled in the settings dialog. The preset section also supports JSON import/export for moving browser-local presets between systems.
 
 Health is intentionally unauthenticated:
 

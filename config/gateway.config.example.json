@@ -48,6 +48,8 @@
         "enabled": true,
         "keys": [
           "benchmark",
+          "system.version",
+          "version",
           "camera.enabled",
           "pause.enabled",
           "pause.image",

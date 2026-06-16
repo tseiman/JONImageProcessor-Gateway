@@ -1,11 +1,16 @@
 const TOKEN_KEY = 'jonGatewayToken';
 const CONFIRM_TIMEOUT_KEY = 'jonGatewayConfirmTimeoutMs';
 const PRESETS_KEY = 'jonGatewayPresets';
+const AUTO_APPLY_DEFAULT_PRESET_KEY = 'jonGatewayAutoApplyDefaultPreset';
+const DEFAULT_PRESET_ID = 'default';
+const DEFAULT_PRESET_NAME = 'Default';
 const DEFAULT_CONFIRM_TIMEOUT_MS = 2500;
 
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || '',
   confirmTimeoutMs: readConfirmTimeout(),
+  autoApplyDefaultPreset: readAutoApplyDefaultPreset(),
+  startupDefaultPresetApplied: false,
   schema: null,
   values: {},
   fpsHistory: [],
@@ -26,6 +31,7 @@ const elements = {
   connectionStatus: document.querySelector('#connectionStatus'),
   fpsStatus: document.querySelector('#fpsStatus'),
   latencyStatus: document.querySelector('#latencyStatus'),
+  jipVersionStatus: document.querySelector('#jipVersionStatus'),
   versionStatus: document.querySelector('#versionStatus'),
   ipcStatus: document.querySelector('#ipcStatus'),
   presetList: document.querySelector('#presetList'),
@@ -42,6 +48,7 @@ const elements = {
   tokenInput: document.querySelector('#tokenInput'),
   showTokenInput: document.querySelector('#showTokenInput'),
   confirmTimeoutInput: document.querySelector('#confirmTimeoutInput'),
+  autoApplyDefaultPresetInput: document.querySelector('#autoApplyDefaultPresetInput'),
   saveTokenButton: document.querySelector('#saveTokenButton'),
   clearTokenButton: document.querySelector('#clearTokenButton')
 };
@@ -142,6 +149,10 @@ function readConfirmTimeout() {
   return clamp(value, 500, 15000);
 }
 
+function readAutoApplyDefaultPreset() {
+  return localStorage.getItem(AUTO_APPLY_DEFAULT_PRESET_KEY) !== 'false';
+}
+
 function setConnected(connected) {
   elements.connectionStatus.textContent = connected ? '● Connected' : '● Disconnected';
   elements.connectionStatus.classList.toggle('connected', connected);
@@ -157,6 +168,7 @@ async function loadValues() {
   const result = await ipc({ cmd: 'list' });
   const changedKeys = applyState(result);
   updateBenchmark(state.values.benchmark);
+  updateJipVersion();
   return changedKeys;
 }
 
@@ -389,6 +401,24 @@ function updateVersion(version) {
   elements.versionStatus.title = `Gateway ${version.packageVersion}`;
 }
 
+function updateJipVersion() {
+  const version = state.values['system.version'] ?? state.values.version;
+  const text = compactVersionText(version);
+  elements.jipVersionStatus.textContent = text ? `JIP git ${text}` : 'JIP git --';
+  elements.jipVersionStatus.title = text ? 'JONImageProcessor version' : 'JONImageProcessor version not reported';
+}
+
+function compactVersionText(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') {
+    return String(value.releaseTag || value.tag || value.gitHash || value.hash || value.version || '').trim();
+  }
+  const text = String(value).trim();
+  if (!text) return '';
+  const gitMatch = text.match(/[0-9a-f]{7,40}/i);
+  return gitMatch ? gitMatch[0].slice(0, 7) : text;
+}
+
 function connectWebSocket() {
   if (!state.token || state.ws?.readyState === WebSocket.OPEN || state.ws?.readyState === WebSocket.CONNECTING) return;
   clearTimeout(state.wsReconnectTimer);
@@ -412,6 +442,7 @@ function connectWebSocket() {
       const changedKeys = applyState(message.state);
       patchControls(changedKeys);
       updateBenchmark(state.values.benchmark);
+      updateJipVersion();
       setConnected(true);
     } else if (message.type === 'state-error') {
       showMessage(message.error || 'State update failed', true);
@@ -478,15 +509,48 @@ function valuesEquivalent(key, actual, expected) {
 function readPresets() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((preset) => preset?.id && preset?.name && preset?.values && typeof preset.values === 'object');
+    if (!Array.isArray(parsed)) return [emptyDefaultPreset()];
+    return ensureDefaultPreset(parsed.filter((preset) => preset?.id && preset?.name && preset?.values && typeof preset.values === 'object'));
   } catch {
-    return [];
+    return [emptyDefaultPreset()];
   }
 }
 
 function writePresets() {
   localStorage.setItem(PRESETS_KEY, JSON.stringify(state.presets));
+}
+
+function emptyDefaultPreset() {
+  const now = new Date().toISOString();
+  return {
+    id: DEFAULT_PRESET_ID,
+    name: DEFAULT_PRESET_NAME,
+    createdAt: now,
+    updatedAt: now,
+    locked: true,
+    values: {}
+  };
+}
+
+function ensureDefaultPreset(presets) {
+  let defaultPreset = presets.find((preset) => preset.id === DEFAULT_PRESET_ID);
+  const legacyDefault = presets.find((preset) => preset.name.toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase());
+  if (!defaultPreset && legacyDefault) {
+    legacyDefault.id = DEFAULT_PRESET_ID;
+    defaultPreset = legacyDefault;
+  }
+  if (!defaultPreset) {
+    defaultPreset = emptyDefaultPreset();
+    presets.unshift(defaultPreset);
+  }
+  defaultPreset.name = DEFAULT_PRESET_NAME;
+  defaultPreset.locked = true;
+  presets.sort((a, b) => {
+    if (a.id === DEFAULT_PRESET_ID) return -1;
+    if (b.id === DEFAULT_PRESET_ID) return 1;
+    return a.name.localeCompare(b.name);
+  });
+  return presets;
 }
 
 function renderPresets() {
@@ -502,12 +566,25 @@ function renderPresets() {
   for (const preset of state.presets) {
     const item = document.createElement('div');
     item.className = 'preset-item';
+    item.classList.toggle('default-preset', preset.id === DEFAULT_PRESET_ID);
 
     const applyButton = document.createElement('button');
     applyButton.className = 'preset-button';
     applyButton.textContent = preset.name;
     applyButton.title = preset.name;
     applyButton.addEventListener('click', () => applyPreset(preset.id));
+
+    if (preset.id === DEFAULT_PRESET_ID) {
+      const updateButton = document.createElement('button');
+      updateButton.className = 'icon-button preset-update-button';
+      updateButton.title = 'Update default preset';
+      updateButton.setAttribute('aria-label', 'Update default preset');
+      updateButton.innerHTML = iconSvg('edit');
+      updateButton.addEventListener('click', () => updatePreset(preset.id));
+      item.append(applyButton, updateButton);
+      elements.presetList.appendChild(item);
+      continue;
+    }
 
     const menuWrap = document.createElement('div');
     menuWrap.className = 'preset-menu-wrap';
@@ -612,6 +689,7 @@ function savePreset(name) {
   }
 
   state.presets.sort((a, b) => a.name.localeCompare(b.name));
+  state.presets = ensureDefaultPreset(state.presets);
   writePresets();
   renderPresets();
   showMessage(`Saved preset ${trimmedName}`);
@@ -657,9 +735,21 @@ async function applyPreset(id) {
   }
 }
 
+async function applyDefaultPresetOnStartup() {
+  if (state.startupDefaultPresetApplied || !state.autoApplyDefaultPreset) return;
+  state.startupDefaultPresetApplied = true;
+  const preset = state.presets.find((item) => item.id === DEFAULT_PRESET_ID);
+  if (!preset || Object.keys(preset.values || {}).length === 0) return;
+  await applyPreset(DEFAULT_PRESET_ID);
+}
+
 function deletePreset(id) {
   const preset = state.presets.find((item) => item.id === id);
   if (!preset) return;
+  if (preset.locked || preset.id === DEFAULT_PRESET_ID) {
+    showMessage('Default preset cannot be deleted', true);
+    return;
+  }
   if (!confirm(`Delete preset "${preset.name}"?`)) return;
   state.presets = state.presets.filter((item) => item.id !== id);
   writePresets();
@@ -703,7 +793,7 @@ async function importPresets(file) {
       else state.presets.push(next);
     }
 
-    state.presets.sort((a, b) => a.name.localeCompare(b.name));
+    state.presets = ensureDefaultPreset(state.presets);
     writePresets();
     renderPresets();
     showMessage(`Imported ${incoming.length} preset${incoming.length === 1 ? '' : 's'}`);
@@ -1781,6 +1871,7 @@ async function refresh(showOk = true) {
     }
     connectWebSocket();
     setConnected(true);
+    await applyDefaultPresetOnStartup();
     if (showOk) showMessage('State refreshed');
   } catch (error) {
     setConnected(false);
@@ -1907,6 +1998,7 @@ function buildKnob(knob, onCommit) {
 elements.settingsButton.addEventListener('click', () => {
   elements.tokenInput.value = state.token;
   elements.confirmTimeoutInput.value = state.confirmTimeoutMs;
+  elements.autoApplyDefaultPresetInput.checked = state.autoApplyDefaultPreset;
   elements.settingsDialog.showModal();
 });
 
@@ -1953,9 +2045,12 @@ elements.saveTokenButton.addEventListener('click', (event) => {
   event.preventDefault();
   state.token = elements.tokenInput.value.trim();
   state.confirmTimeoutMs = clamp(Number(elements.confirmTimeoutInput.value), 500, 15000);
+  state.autoApplyDefaultPreset = elements.autoApplyDefaultPresetInput.checked;
   localStorage.setItem(TOKEN_KEY, state.token);
   localStorage.setItem(CONFIRM_TIMEOUT_KEY, String(state.confirmTimeoutMs));
+  localStorage.setItem(AUTO_APPLY_DEFAULT_PRESET_KEY, String(state.autoApplyDefaultPreset));
   state.schema = null;
+  state.startupDefaultPresetApplied = false;
   closeWebSocket();
   elements.settingsDialog.close();
   refresh();

@@ -26,6 +26,7 @@
         </svg>
       </span>
       <span id="latencyStatus">Latency --</span>
+      <span id="jipVersionStatus">JIP git --</span>
       <span id="versionStatus">Version --</span>
       <span id="ipcStatus">IPC idle</span>
       <button id="settingsButton" class="icon-button status-icon" title="Settings" aria-label="Settings">⚙</button>
@@ -70,6 +71,10 @@
       <label class="field">
         <span>Control confirmation timeout (ms)</span>
         <input id="confirmTimeoutInput" type="number" min="500" max="15000" step="100">
+      </label>
+      <label class="checkbox">
+        <input id="autoApplyDefaultPresetInput" type="checkbox">
+        <span>Apply default preset on startup</span>
       </label>
       <div class="dialog-actions">
         <button id="clearTokenButton" value="clear" class="secondary">Clear</button>
