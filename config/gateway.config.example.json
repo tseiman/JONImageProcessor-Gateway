@@ -53,15 +53,15 @@
           "segmentation.threshold",
           "segmentation.smoothing",
           "segmentation.morphology",
+          "runtime.noOverlay",
           "background.effect",
+          "background.blurStrength",
           "background.image",
           "background.folder",
-          "background.loopIfVideo",
           "background.overlayColor",
           "background.overlayAlpha",
-          "background.blurStrength",
-          "runtime.noMask",
-          "runtime.noOverlay"
+          "background.loopIfVideo",
+          "runtime.noMask"
         ]
       },
       "set": {
@@ -88,14 +88,14 @@
           "segmentation.threshold": { "type": "number", "min": 0, "max": 1 },
           "segmentation.smoothing": { "type": "number", "min": 0, "max": 1 },
           "segmentation.morphology": { "type": "string", "enum": ["off", "light", "strong"] },
-          "background.effect": { "type": "string", "enum": ["none", "color", "blur", "image"] },
-          "background.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "backgrounds" },
-          "background.loopIfVideo": { "type": "boolean" },
-          "background.overlayColor": { "type": "string", "pattern": "^([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$" },
-          "background.overlayAlpha": { "type": "number", "min": 0, "max": 1 },
-          "background.blurStrength": { "type": "integer", "min": 1, "max": 100 },
+          "background.effect": { "type": "string", "enum": ["none", "color", "blur", "image"], "ui": { "section": "background", "order": 20 } },
+          "background.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "backgrounds", "ui": { "section": "background", "order": 40 } },
+          "background.loopIfVideo": { "type": "boolean", "ui": { "section": "background", "order": 60 } },
+          "background.overlayColor": { "type": "string", "pattern": "^([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]),([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$", "ui": { "section": "background", "order": 50, "combinedWith": "background.overlayAlpha" } },
+          "background.overlayAlpha": { "type": "number", "min": 0, "max": 1, "ui": { "section": "background", "order": 51, "hidden": true, "combinedWith": "background.overlayColor" } },
+          "background.blurStrength": { "type": "integer", "min": 1, "max": 100, "ui": { "section": "background", "order": 30 } },
           "runtime.noMask": { "type": "boolean" },
-          "runtime.noOverlay": { "type": "boolean" }
+          "runtime.noOverlay": { "type": "boolean", "ui": { "section": "background", "order": 10, "label": "Enable Background" } }
         }
       }
     }

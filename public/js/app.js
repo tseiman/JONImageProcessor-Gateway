@@ -56,11 +56,7 @@ const STAGES = [
   },
   {
     title: 'BACKGROUND',
-    keys: ['background.effect', 'background.blurStrength', 'background.image', 'background.loopIfVideo']
-  },
-  {
-    title: 'OVERLAY',
-    keys: ['runtime.noOverlay', 'background.overlayColor']
+    keys: ['runtime.noOverlay', 'background.effect', 'background.blurStrength', 'background.image', 'background.overlayColor', 'background.loopIfVideo']
   },
   {
     title: 'PAUSE',
@@ -78,9 +74,9 @@ const LABELS = {
   'background.blurStrength': 'Blur Strength',
   'background.image': 'Background Asset',
   'background.loopIfVideo': 'Loop Background Video',
-  'runtime.noOverlay': 'Enable Overlay',
+  'runtime.noOverlay': 'Enable Background',
   'background.overlayAlpha': 'Alpha',
-  'background.overlayColor': 'RGB Color',
+  'background.overlayColor': 'Background Color',
   'pause.enabled': 'Pause Image',
   'pause.image': 'Pause Asset',
   'pause.loopIfVideo': 'Loop Pause Video',
