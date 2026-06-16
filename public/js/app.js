@@ -757,7 +757,7 @@ function updateEnumControl(control, key) {
 function renderNumberControl(key, rule) {
   const min = rule.min ?? 0;
   const max = rule.max ?? 100;
-  const step = Number(rule.step ?? rule.ui?.step ?? (rule.type === 'integer' ? 1 : 0.01));
+  const step = numberStep(key, rule);
   const value = Number(state.values[key] ?? min);
   const control = controlShell(key, `${min} bis ${max}`);
   control.dataset.kind = 'number';
@@ -780,6 +780,11 @@ function renderNumberControl(key, rule) {
   control.appendChild(wrap);
   buildKnob(knob, (nextValue) => setValue(key, rule.type === 'integer' ? Math.round(nextValue) : nextValue));
   return control;
+}
+
+function numberStep(key, rule) {
+  if (key === 'segmentation.threshold') return 0.001;
+  return Number(rule.step ?? rule.ui?.step ?? (rule.type === 'integer' ? 1 : 0.01));
 }
 
 function updateNumberControl(control, key) {
@@ -1478,6 +1483,7 @@ function buildKnob(knob, onCommit) {
   const max = Number(knob.dataset.max);
   const step = Number(knob.dataset.step);
   const decimals = decimalsFromStep(step);
+  const dragSensitivity = Math.min((max - min) / 160, step);
 
   knob.innerHTML = `
     <svg viewBox="0 0 120 120">
@@ -1531,7 +1537,7 @@ function buildKnob(knob, onCommit) {
   knob.addEventListener('pointermove', (event) => {
     if (!dragging) return;
     const delta = startY - event.clientY;
-    setDisplay(startValue + (delta * ((max - min) / 160)));
+    setDisplay(startValue + (delta * dragSensitivity));
   });
 
   knob.addEventListener('pointerup', (event) => {
