@@ -4,6 +4,8 @@
 
 Node.js gateway for the local `JONImageProcessor` runtime IPC API. The gateway exposes an authenticated HTTP JSON API, a WebSocket API, and file-management endpoints for media folders that are needed by the remote UI.
 
+<img src="docs/JIP_GUI_Screenshot.jpg" width="720" alt="JONImageProcessor Gateway WebUI screenshot">
+
 `JONImageProcessor` itself speaks NDJSON over a Unix domain socket, usually `/tmp/jonimageprocessor.sock`. This gateway validates incoming commands against a local JSON schema, forwards allowed IPC requests to that socket, and handles media upload/delete separately through configured working directories.
 
 ## Requirements
