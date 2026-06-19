@@ -20,6 +20,8 @@ const state = {
   lastFpsPaintMs: 0,
   lastFpsGraphSampleMs: 0,
   presets: [],
+  presetDialogMode: 'save',
+  presetDialogPresetId: '',
   assets: { backgrounds: [], pause: [] },
   pending: {},
   ws: null,
@@ -43,8 +45,12 @@ const elements = {
   exportPresetsButton: document.querySelector('#exportPresetsButton'),
   importPresetsInput: document.querySelector('#importPresetsInput'),
   presetDialog: document.querySelector('#presetDialog'),
+  presetForm: document.querySelector('#presetForm'),
+  presetDialogTitle: document.querySelector('#presetDialogTitle'),
   presetNameInput: document.querySelector('#presetNameInput'),
   confirmSavePresetButton: document.querySelector('#confirmSavePresetButton'),
+  closePresetDialogButton: document.querySelector('#closePresetDialogButton'),
+  cancelPresetDialogButton: document.querySelector('#cancelPresetDialogButton'),
   defaultPresetDialog: document.querySelector('#defaultPresetDialog'),
   applyDefaultPresetButton: document.querySelector('#applyDefaultPresetButton'),
   skipDefaultPresetButton: document.querySelector('#skipDefaultPresetButton'),
@@ -571,6 +577,7 @@ function renderPresets() {
     menu.hidden = true;
     menu.append(
       presetMenuItem(iconSvg('edit'), 'Update', () => updatePreset(preset.id)),
+      presetMenuItem(iconSvg('rename'), 'Rename', () => openPresetDialog('rename', preset)),
       presetMenuItem(iconSvg('download'), 'Download', () => exportPreset(preset)),
       presetMenuItem(iconSvg('trash'), 'Delete', () => deletePreset(preset.id))
     );
@@ -607,6 +614,9 @@ function iconSvg(name) {
   if (name === 'download') {
     return `<svg ${attrs}><path d="M12 4v11"></path><path d="M7 10l5 5 5-5"></path><path d="M5 20h14"></path></svg>`;
   }
+  if (name === 'rename') {
+    return `<svg ${attrs}><path d="M4 17l4 3 12-12-4-4L4 16v1z"></path><path d="M13 7l4 4"></path><path d="M4 21h16"></path></svg>`;
+  }
   return `<svg ${attrs}><path d="M4 7h16"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M6 7l1 14h10l1-14"></path><path d="M9 7V4h6v3"></path></svg>`;
 }
 
@@ -641,7 +651,7 @@ async function savePreset(name) {
     return false;
   }
   try {
-    await savePresetToServer(presetIdForName(trimmedName), values);
+    await savePresetToServer(presetIdForName(trimmedName), values, trimmedName);
     await loadPresets();
     renderPresets();
     showMessage(`Saved preset ${trimmedName}`);
@@ -661,7 +671,7 @@ async function updatePreset(id) {
     return false;
   }
   try {
-    await savePresetToServer(id, values);
+    await savePresetToServer(id, values, preset.name);
     await loadPresets();
     renderPresets();
     showMessage(`Updated preset ${preset.name}`);
@@ -741,6 +751,26 @@ function confirmDefaultPresetApply() {
   });
 }
 
+async function renamePreset(id, name) {
+  const preset = state.presets.find((item) => item.id === id);
+  const trimmedName = name.trim();
+  if (!preset) return false;
+  if (!trimmedName) {
+    showMessage('Preset name is required', true);
+    return false;
+  }
+  try {
+    await renamePresetOnServer(id, trimmedName);
+    await loadPresets();
+    renderPresets();
+    showMessage(`Renamed preset ${preset.name}`);
+    return true;
+  } catch (error) {
+    showMessage(error.message, true);
+    return false;
+  }
+}
+
 function deletePreset(id) {
   const preset = state.presets.find((item) => item.id === id);
   if (!preset) return;
@@ -778,7 +808,7 @@ async function importPresets(file) {
     if (incoming.length === 0) throw new Error('No presets found in file');
 
     for (const preset of incoming) {
-      await savePresetToServer(preset.id || preset.name, preset.values || preset.config || {});
+      await savePresetToServer(preset.id || preset.name, preset.values || preset.config || {}, preset.name);
     }
 
     await loadPresets();
@@ -792,6 +822,13 @@ async function importPresets(file) {
 }
 
 function normalizeImportedPresets(data) {
+  if (data?.type === 'JONImageProcessorGatewayPreset' && data.preset?.name) {
+    return [{
+      id: typeof data.preset.id === 'string' ? data.preset.id : '',
+      name: String(data.preset.name).trim(),
+      config: data
+    }].filter((preset) => preset.name);
+  }
   const candidates = Array.isArray(data) ? data : data.presets || (data.preset ? [data.preset] : null);
   if (!Array.isArray(candidates) && data && typeof data === 'object') {
     const name = elements.importPresetsInput.files[0]?.name?.replace(/\.json$/i, '') || 'preset';
@@ -818,11 +855,30 @@ function presetIdForName(name) {
   return name.trim().toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase() ? DEFAULT_PRESET_ID : name;
 }
 
-async function savePresetToServer(idOrName, values) {
+function openPresetDialog(mode, preset = null) {
+  state.presetDialogMode = mode;
+  state.presetDialogPresetId = preset?.id || '';
+  elements.presetDialogTitle.textContent = mode === 'rename' ? 'Rename Preset' : 'Save Preset';
+  elements.confirmSavePresetButton.textContent = mode === 'rename' ? 'Rename' : 'Save';
+  elements.presetNameInput.value = mode === 'rename' ? preset?.name || '' : '';
+  elements.presetDialog.showModal();
+  elements.presetNameInput.focus();
+  elements.presetNameInput.select();
+}
+
+async function savePresetToServer(idOrName, values, name = '') {
   return await apiFetch(`/api/presets/${encodeURIComponent(idOrName)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values })
+    body: JSON.stringify({ values, name })
+  });
+}
+
+async function renamePresetOnServer(id, name) {
+  return await apiFetch(`/api/presets/${encodeURIComponent(id)}/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
   });
 }
 
@@ -2017,15 +2073,19 @@ elements.settingsButton.addEventListener('click', () => {
 });
 
 elements.savePresetButton.addEventListener('click', () => {
-  elements.presetNameInput.value = '';
-  elements.presetDialog.showModal();
-  elements.presetNameInput.focus();
+  openPresetDialog('save');
 });
 
-elements.confirmSavePresetButton.addEventListener('click', async (event) => {
+elements.presetForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (await savePreset(elements.presetNameInput.value)) elements.presetDialog.close();
+  const ok = state.presetDialogMode === 'rename'
+    ? await renamePreset(state.presetDialogPresetId, elements.presetNameInput.value)
+    : await savePreset(elements.presetNameInput.value);
+  if (ok) elements.presetDialog.close();
 });
+
+elements.closePresetDialogButton.addEventListener('click', () => elements.presetDialog.close());
+elements.cancelPresetDialogButton.addEventListener('click', () => elements.presetDialog.close());
 
 elements.importPresetsButton.addEventListener('click', () => {
   elements.importPresetsInput.click();

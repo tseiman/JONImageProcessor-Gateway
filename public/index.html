@@ -85,18 +85,18 @@
   </dialog>
 
   <dialog id="presetDialog" class="settings-dialog">
-    <form method="dialog">
+    <form id="presetForm" method="dialog">
       <div class="dialog-head">
-        <h2>Save Preset</h2>
-        <button value="close" class="icon-button" aria-label="Close">×</button>
+        <h2 id="presetDialogTitle">Save Preset</h2>
+        <button id="closePresetDialogButton" type="button" class="icon-button" aria-label="Close">×</button>
       </div>
       <label class="field">
         <span>Name</span>
         <input id="presetNameInput" type="text" autocomplete="off">
       </label>
       <div class="dialog-actions">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button id="confirmSavePresetButton" value="save" class="primary">Save</button>
+        <button id="cancelPresetDialogButton" type="button" class="secondary">Cancel</button>
+        <button id="confirmSavePresetButton" type="submit" value="save" class="primary">Save</button>
       </div>
     </form>
   </dialog>

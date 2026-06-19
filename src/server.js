@@ -10,7 +10,7 @@ import { handleUpgrade, setMutationPollRequester } from './websocket.js';
 import { prepareIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
 import { startStatePolling } from './statePoller.js';
-import { applyPreset, deletePreset, listPresets, readPreset, savePreset } from './presetStore.js';
+import { applyPreset, deletePreset, listPresets, readPreset, renamePreset, savePreset } from './presetStore.js';
 
 const config = loadConfig();
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
@@ -95,7 +95,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const presetMatch = url.pathname.match(/^\/api\/presets(?:\/([^/]+)(?:\/(apply))?)?$/);
+    const presetMatch = url.pathname.match(/^\/api\/presets(?:\/([^/]+)(?:\/(apply|rename))?)?$/);
     if (presetMatch) {
       const presetId = presetMatch[1] ? decodeURIComponent(presetMatch[1]) : '';
       const action = presetMatch[2] || '';
@@ -109,7 +109,15 @@ const server = http.createServer(async (req, res) => {
       }
       if ((req.method === 'PUT' || req.method === 'POST') && presetId && !action) {
         const body = await readJson(req);
-        await writeJson(req, res, 200, { ok: true, preset: await savePreset(presetId, body.values || body.config || body, config) });
+        await writeJson(req, res, 200, {
+          ok: true,
+          preset: await savePreset(presetId, body.values || body.config || body, config, { name: body.name })
+        });
+        return;
+      }
+      if (req.method === 'POST' && presetId && action === 'rename') {
+        const body = await readJson(req);
+        await writeJson(req, res, 200, { ok: true, preset: await renamePreset(presetId, body.name, config) });
         return;
       }
       if (req.method === 'POST' && presetId && action === 'apply') {
