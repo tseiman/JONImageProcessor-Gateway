@@ -536,11 +536,13 @@ function renderPresets() {
     const item = document.createElement('div');
     item.className = 'preset-item';
     item.classList.toggle('default-preset', preset.id === DEFAULT_PRESET_ID);
+    item.classList.toggle('missing-preset', !preset.exists);
 
     const applyButton = document.createElement('button');
     applyButton.className = 'preset-button';
     applyButton.textContent = preset.name;
-    applyButton.title = preset.name;
+    applyButton.title = preset.exists ? preset.name : `${preset.name} not saved yet`;
+    applyButton.disabled = !preset.exists;
     applyButton.addEventListener('click', () => applyPreset(preset.id));
 
     if (preset.id === DEFAULT_PRESET_ID) {

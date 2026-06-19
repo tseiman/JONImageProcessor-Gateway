@@ -194,6 +194,15 @@ button, input, select {
   font-size: 15px;
 }
 
+.preset-item.missing-preset .preset-button {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.preset-item.missing-preset .preset-update-button {
+  opacity: 1;
+}
+
 .preset-menu-wrap {
   position: relative;
 }
