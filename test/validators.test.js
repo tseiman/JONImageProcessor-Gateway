@@ -14,6 +14,7 @@ const config = {
           'background.blurStrength': { type: 'integer', min: 1, max: 100 },
           'background.effect': { type: 'string', enum: ['none', 'color', 'blur', 'image'] },
           'background.image': { type: 'string', pattern: '^[A-Za-z0-9._-]+$', maxLength: 120, assetRoot: 'backgrounds' },
+          'config': { type: 'string', pattern: '^[A-Za-z0-9_-]+$', maxLength: 120 },
           'pause.font': { type: 'string', pattern: '^[A-Za-z0-9._-]+$', maxLength: 120 },
           'pause.fontAlign': { type: 'string', enum: ['left', 'center', 'right'] }
         }
@@ -31,6 +32,18 @@ test('allows configured get and set IPC requests', () => {
     ok: true,
     request: { cmd: 'set', key: 'segmentation.threshold', value: 0.75 }
   });
+});
+
+test('allows safe overlay config names', () => {
+  assert.deepEqual(validateIpcRequest({ cmd: 'set', key: 'config', value: 'meeting-room_1' }, config), {
+    ok: true,
+    request: { cmd: 'set', key: 'config', value: 'meeting-room_1' }
+  });
+});
+
+test('rejects unsafe overlay config names', () => {
+  assert.equal(validateIpcRequest({ cmd: 'set', key: 'config', value: '../meeting' }, config).ok, false);
+  assert.equal(validateIpcRequest({ cmd: 'set', key: 'config', value: 'meeting.room' }, config).ok, false);
 });
 
 test('rejects out-of-range and unknown IPC writes', () => {

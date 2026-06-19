@@ -153,7 +153,7 @@ The top status row shows the gateway Git hash from `src/version-info.json`. If t
 
 The gateway also polls the `JONImageProcessor` Unix socket regularly and broadcasts state updates to the WebUI through `/api/ws`. After the UI sends a setting change, the gateway triggers an additional poll. The UI keeps the changed control in a pending state until the polled server state confirms it; if confirmation times out, the control rolls back to the previous value. The browser-side confirmation timeout is configurable in the WebUI settings dialog.
 
-WebUI presets are stored locally in the browser. `Save Preset` stores the current settable values from the gateway schema, clicking a preset sends those values back to the gateway, and the preset action menu provides update, JSON export, and delete. The protected `Default` preset can only be updated and is applied automatically when the WebUI starts unless that option is disabled in the settings dialog. The preset section also supports JSON import/export for moving browser-local presets between systems.
+WebUI presets are stored as JONImageProcessor overlay configuration files in the read-only IPC `system.configDirectory` directory, not in browser storage. `Save Preset` writes an overlay JSON file through the gateway, clicking a preset applies it through IPC `set config <name>`, and the preset action menu provides update, JSON export, and delete. The protected `Default` preset can only be updated and is applied after user confirmation when the WebUI starts unless that option is disabled in the settings dialog. The preset section also supports JSON import/export for moving overlay configs between systems.
 
 Health is intentionally unauthenticated:
 
@@ -233,6 +233,26 @@ curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
 ```
 
 For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`.
+
+List, write, apply, and delete overlay presets:
+
+```bash
+curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/presets
+
+curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"values":{"background.effect":"blur","background.blurStrength":30}}' \
+  http://127.0.0.1:8080/api/presets/meeting-room
+
+curl -X POST -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/presets/meeting-room/apply
+
+curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/presets/meeting-room
+```
+
+Preset names are converted to JONImageProcessor-safe config names containing only letters, digits, `_`, and `-`. The resulting files are stored as `<name>.json` in `system.configDirectory`.
 
 ## WebSocket API
 

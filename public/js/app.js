@@ -1,6 +1,5 @@
 const TOKEN_KEY = 'jonGatewayToken';
 const CONFIRM_TIMEOUT_KEY = 'jonGatewayConfirmTimeoutMs';
-const PRESETS_KEY = 'jonGatewayPresets';
 const AUTO_APPLY_DEFAULT_PRESET_KEY = 'jonGatewayAutoApplyDefaultPreset';
 const DEFAULT_PRESET_ID = 'default';
 const DEFAULT_PRESET_NAME = 'Default';
@@ -20,7 +19,7 @@ const state = {
   fpsHistory: [],
   lastFpsPaintMs: 0,
   lastFpsGraphSampleMs: 0,
-  presets: readPresets(),
+  presets: [],
   assets: { backgrounds: [], pause: [] },
   pending: {},
   ws: null,
@@ -523,53 +522,6 @@ function valuesEquivalent(key, actual, expected) {
   return actual === expected;
 }
 
-function readPresets() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PRESETS_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [emptyDefaultPreset()];
-    return ensureDefaultPreset(parsed.filter((preset) => preset?.id && preset?.name && preset?.values && typeof preset.values === 'object'));
-  } catch {
-    return [emptyDefaultPreset()];
-  }
-}
-
-function writePresets() {
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(state.presets));
-}
-
-function emptyDefaultPreset() {
-  const now = new Date().toISOString();
-  return {
-    id: DEFAULT_PRESET_ID,
-    name: DEFAULT_PRESET_NAME,
-    createdAt: now,
-    updatedAt: now,
-    locked: true,
-    values: {}
-  };
-}
-
-function ensureDefaultPreset(presets) {
-  let defaultPreset = presets.find((preset) => preset.id === DEFAULT_PRESET_ID);
-  const legacyDefault = presets.find((preset) => preset.name.toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase());
-  if (!defaultPreset && legacyDefault) {
-    legacyDefault.id = DEFAULT_PRESET_ID;
-    defaultPreset = legacyDefault;
-  }
-  if (!defaultPreset) {
-    defaultPreset = emptyDefaultPreset();
-    presets.unshift(defaultPreset);
-  }
-  defaultPreset.name = DEFAULT_PRESET_NAME;
-  defaultPreset.locked = true;
-  presets.sort((a, b) => {
-    if (a.id === DEFAULT_PRESET_ID) return -1;
-    if (b.id === DEFAULT_PRESET_ID) return 1;
-    return a.name.localeCompare(b.name);
-  });
-  return presets;
-}
-
 function renderPresets() {
   elements.presetList.innerHTML = '';
   if (state.presets.length === 0) {
@@ -669,51 +621,36 @@ function currentPresetValues() {
   const items = state.schema?.api?.commands?.set?.items || {};
   const values = {};
   for (const key of Object.keys(items)) {
-    if (state.values[key] !== undefined) values[key] = normalizePresetValue(key, state.values[key], items[key]);
+    if (state.values[key] !== undefined) values[key] = state.values[key];
   }
   return values;
 }
 
-function normalizePresetValue(key, value, rule) {
-  if (rule?.assetRoot || key.endsWith('.image')) return assetIdFromValue(value);
-  return value;
-}
-
-function savePreset(name) {
+async function savePreset(name) {
   const trimmedName = name.trim();
   if (!trimmedName) {
     showMessage('Preset name is required', true);
     return false;
   }
 
-  const existing = state.presets.find((preset) => preset.name.toLowerCase() === trimmedName.toLowerCase());
-  const preset = {
-    id: existing?.id || `preset-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    name: trimmedName,
-    createdAt: existing?.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    values: currentPresetValues()
-  };
-  if (Object.keys(preset.values).length === 0) {
+  const values = currentPresetValues();
+  if (Object.keys(values).length === 0) {
     showMessage('No settings loaded for preset', true);
     return false;
   }
-
-  if (existing) {
-    Object.assign(existing, preset);
-  } else {
-    state.presets.push(preset);
+  try {
+    await savePresetToServer(presetIdForName(trimmedName), values);
+    await loadPresets();
+    renderPresets();
+    showMessage(`Saved preset ${trimmedName}`);
+    return true;
+  } catch (error) {
+    showMessage(error.message, true);
+    return false;
   }
-
-  state.presets.sort((a, b) => a.name.localeCompare(b.name));
-  state.presets = ensureDefaultPreset(state.presets);
-  writePresets();
-  renderPresets();
-  showMessage(`Saved preset ${trimmedName}`);
-  return true;
 }
 
-function updatePreset(id) {
+async function updatePreset(id) {
   const preset = state.presets.find((item) => item.id === id);
   if (!preset) return false;
   const values = currentPresetValues();
@@ -721,34 +658,32 @@ function updatePreset(id) {
     showMessage('No settings loaded for preset', true);
     return false;
   }
-  preset.values = values;
-  preset.updatedAt = new Date().toISOString();
-  writePresets();
-  renderPresets();
-  showMessage(`Updated preset ${preset.name}`);
-  return true;
+  try {
+    await savePresetToServer(id, values);
+    await loadPresets();
+    renderPresets();
+    showMessage(`Updated preset ${preset.name}`);
+    return true;
+  } catch (error) {
+    showMessage(error.message, true);
+    return false;
+  }
 }
 
 async function applyPreset(id) {
   const preset = state.presets.find((item) => item.id === id);
   if (!preset) return;
-  const items = state.schema?.api?.commands?.set?.items || {};
-  const entries = Object.entries(preset.values || {})
-    .filter(([key, value]) => items[key] && value !== undefined)
-    .map(([key, value]) => [key, normalizePresetValue(key, value, items[key])]);
-  if (entries.length === 0) {
+  if (!preset.exists || Object.keys(preset.values || {}).length === 0) {
     showMessage('Preset has no settings', true);
     return;
   }
-
-  const failed = [];
-  for (const [key, value] of entries) {
-    if (!await setValue(key, value)) failed.push(LABELS[key] || key);
-  }
-  if (failed.length > 0) {
-    showMessage(`Applied preset ${preset.name}; failed: ${failed.join(', ')}`, true);
-  } else {
+  try {
+    await apiFetch(`/api/presets/${encodeURIComponent(id)}/apply`, { method: 'POST' });
+    const changedKeys = await loadValues();
+    patchControls(changedKeys);
     showMessage(`Applied preset ${preset.name}`);
+  } catch (error) {
+    showMessage(error.message, true);
   }
 }
 
@@ -812,25 +747,24 @@ function deletePreset(id) {
     return;
   }
   if (!confirm(`Delete preset "${preset.name}"?`)) return;
-  state.presets = state.presets.filter((item) => item.id !== id);
-  writePresets();
-  renderPresets();
-  showMessage(`Deleted preset ${preset.name}`);
+  deletePresetFromServer(id)
+    .then(async () => {
+      await loadPresets();
+      renderPresets();
+      showMessage(`Deleted preset ${preset.name}`);
+    })
+    .catch((error) => showMessage(error.message, true));
 }
 
 function exportPreset(preset) {
-  downloadJson(`jonimageprocessor-preset-${safeFileName(preset.name)}.json`, {
-    type: 'JONImageProcessorGatewayPreset',
-    version: 1,
-    preset
-  });
+  downloadJson(`${safeFileName(preset.id)}.json`, preset.config || {});
 }
 
 function exportPresets() {
   downloadJson('jonimageprocessor-presets.json', {
     type: 'JONImageProcessorGatewayPresets',
     version: 1,
-    presets: state.presets
+    presets: state.presets.filter((preset) => preset.exists)
   });
 }
 
@@ -842,20 +776,10 @@ async function importPresets(file) {
     if (incoming.length === 0) throw new Error('No presets found in file');
 
     for (const preset of incoming) {
-      const existing = state.presets.find((item) => item.name.toLowerCase() === preset.name.toLowerCase());
-      const next = {
-        id: existing?.id || preset.id || `preset-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        name: preset.name,
-        createdAt: existing?.createdAt || preset.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        values: preset.values
-      };
-      if (existing) Object.assign(existing, next);
-      else state.presets.push(next);
+      await savePresetToServer(preset.id || preset.name, preset.values || preset.config || {});
     }
 
-    state.presets = ensureDefaultPreset(state.presets);
-    writePresets();
+    await loadPresets();
     renderPresets();
     showMessage(`Imported ${incoming.length} preset${incoming.length === 1 ? '' : 's'}`);
   } catch (error) {
@@ -866,17 +790,42 @@ async function importPresets(file) {
 }
 
 function normalizeImportedPresets(data) {
-  const candidates = Array.isArray(data) ? data : data.presets || (data.preset ? [data.preset] : []);
+  const candidates = Array.isArray(data) ? data : data.presets || (data.preset ? [data.preset] : null);
+  if (!Array.isArray(candidates) && data && typeof data === 'object') {
+    const name = elements.importPresetsInput.files[0]?.name?.replace(/\.json$/i, '') || 'preset';
+    return [{ id: safeFileName(name), name: safeFileName(name), config: data }];
+  }
   if (!Array.isArray(candidates)) return [];
   return candidates
-    .filter((preset) => preset?.name && preset?.values && typeof preset.values === 'object')
+    .filter((preset) => preset?.name && ((preset.values && typeof preset.values === 'object') || (preset.config && typeof preset.config === 'object')))
     .map((preset) => ({
       id: typeof preset.id === 'string' ? preset.id : '',
       name: String(preset.name).trim(),
-      createdAt: typeof preset.createdAt === 'string' ? preset.createdAt : '',
-      values: preset.values
+      values: preset.values,
+      config: preset.config
     }))
     .filter((preset) => preset.name);
+}
+
+async function loadPresets() {
+  const data = await apiFetch('/api/presets');
+  state.presets = data.presets || [];
+}
+
+function presetIdForName(name) {
+  return name.trim().toLowerCase() === DEFAULT_PRESET_NAME.toLowerCase() ? DEFAULT_PRESET_ID : name;
+}
+
+async function savePresetToServer(idOrName, values) {
+  return await apiFetch(`/api/presets/${encodeURIComponent(idOrName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values })
+  });
+}
+
+async function deletePresetFromServer(id) {
+  return await apiFetch(`/api/presets/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 function downloadJson(fileName, data) {
@@ -1925,6 +1874,8 @@ async function refresh(showOk = true) {
     if (!state.schema) await loadSchema();
     const changedAssetRoots = await loadAssets();
     const changedKeys = await loadValues();
+    await loadPresets();
+    renderPresets();
     if (!state.rendered) render();
     else {
       refreshAssetControls(changedAssetRoots);
@@ -2069,9 +2020,9 @@ elements.savePresetButton.addEventListener('click', () => {
   elements.presetNameInput.focus();
 });
 
-elements.confirmSavePresetButton.addEventListener('click', (event) => {
+elements.confirmSavePresetButton.addEventListener('click', async (event) => {
   event.preventDefault();
-  if (savePreset(elements.presetNameInput.value)) elements.presetDialog.close();
+  if (await savePreset(elements.presetNameInput.value)) elements.presetDialog.close();
 });
 
 elements.importPresetsButton.addEventListener('click', () => {

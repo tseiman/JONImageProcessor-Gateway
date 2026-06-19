@@ -10,6 +10,7 @@ import { handleUpgrade, setMutationPollRequester } from './websocket.js';
 import { prepareIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
 import { startStatePolling } from './statePoller.js';
+import { applyPreset, deletePreset, listPresets, readPreset, savePreset } from './presetStore.js';
 
 const config = loadConfig();
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
@@ -91,6 +92,37 @@ const server = http.createServer(async (req, res) => {
       }
       if (prepared.request.cmd === 'set') statePoller.requestPoll('http-set');
       await writeJson(req, res, response.ok === false ? 502 : 200, response);
+      return;
+    }
+
+    const presetMatch = url.pathname.match(/^\/api\/presets(?:\/([^/]+)(?:\/(apply))?)?$/);
+    if (presetMatch) {
+      const presetId = presetMatch[1] ? decodeURIComponent(presetMatch[1]) : '';
+      const action = presetMatch[2] || '';
+      if (req.method === 'GET' && !presetId) {
+        await writeJson(req, res, 200, { ok: true, presets: await listPresets(config) });
+        return;
+      }
+      if (req.method === 'GET' && presetId && !action) {
+        await writeJson(req, res, 200, { ok: true, preset: await readPreset(presetId, config) });
+        return;
+      }
+      if ((req.method === 'PUT' || req.method === 'POST') && presetId && !action) {
+        const body = await readJson(req);
+        await writeJson(req, res, 200, { ok: true, preset: await savePreset(presetId, body.values || body.config || body, config) });
+        return;
+      }
+      if (req.method === 'POST' && presetId && action === 'apply') {
+        const response = await applyPreset(presetId, config);
+        statePoller.requestPoll('http-preset');
+        await writeJson(req, res, 200, { ok: true, response });
+        return;
+      }
+      if (req.method === 'DELETE' && presetId && !action) {
+        await writeJson(req, res, 200, { ok: true, preset: await deletePreset(presetId, config) });
+        return;
+      }
+      await writeJson(req, res, 405, { ok: false, error: 'Method not allowed for preset.' });
       return;
     }
 
@@ -242,6 +274,7 @@ function contentType(filePath) {
     case '.css': return 'text/css; charset=utf-8';
     case '.js': return 'text/javascript; charset=utf-8';
     case '.svg': return 'image/svg+xml';
+    case '.ico': return 'image/x-icon';
     case '.png': return 'image/png';
     case '.jpg':
     case '.jpeg': return 'image/jpeg';

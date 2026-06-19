@@ -50,6 +50,9 @@
           "benchmark",
           "system.version",
           "version",
+          "system.configDirectory",
+          "configDirectory",
+          "config",
           "camera.enabled",
           "pause.enabled",
           "pause.image",
@@ -80,6 +83,7 @@
         "enabled": true,
         "items": {
           "camera.enabled": { "type": "boolean" },
+          "config": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$", "maxLength": 120 },
           "pause.enabled": { "type": "boolean" },
           "pause.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "pause" },
           "pause.loopIfVideo": { "type": "boolean" },
