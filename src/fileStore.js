@@ -105,6 +105,26 @@ export async function deleteFile(rootName, assetName, config) {
   return { deleted: path.basename(target) };
 }
 
+export async function downloadFile(rootName, assetName, config) {
+  const root = rootConfig(rootName, config);
+  if (root.kind !== 'file') throw httpError(405, 'Downloads are only available for file roots.');
+  const fileName = flatFileNameFromAssetName(assetName, root);
+  const target = resolveFlatFileTarget(root, fileName);
+  const stat = await fs.promises.stat(target).catch((error) => {
+    if (error.code === 'ENOENT') throw httpError(404, 'File not found.');
+    throw error;
+  });
+  if (!stat.isFile()) throw httpError(404, 'File not found.');
+  return {
+    id: path.basename(fileName, path.extname(fileName)),
+    fileName,
+    filePath: target,
+    contentType: contentTypeForExtension(path.extname(fileName)),
+    size: stat.size,
+    mtime: stat.mtime.toISOString()
+  };
+}
+
 export async function resolveAssetStartFile(rootName, assetName, config) {
   const root = rootConfig(rootName, config);
   const packageDir = resolvePackageTarget(root, assetName);
@@ -233,6 +253,11 @@ function flatFileNameFromAssetName(assetName, root) {
 
 function allowedExtensions(root) {
   return new Set((root.allowedExtensions || []).map((extension) => extension.toLowerCase()));
+}
+
+function contentTypeForExtension(extension) {
+  if (extension.toLowerCase() === '.ttf') return 'font/ttf';
+  return 'application/octet-stream';
 }
 
 function resolvePackageTarget(root, assetName) {

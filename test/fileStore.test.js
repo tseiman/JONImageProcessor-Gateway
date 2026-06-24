@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { deleteFile, listFiles, resolveAssetStartFile } from '../src/fileStore.js';
+import { deleteFile, downloadFile, listFiles, resolveAssetStartFile } from '../src/fileStore.js';
 
 async function withTempRoot(fn) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'jon-gateway-test-'));
@@ -112,5 +112,27 @@ test('deletes TTF files by font id', async () => {
     const result = await deleteFile('fonts', 'Inter', fontConfigFor(root));
     assert.deepEqual(result, { deleted: 'Inter' });
     await assert.rejects(fs.stat(path.join(root, 'Inter.ttf')));
+  });
+});
+
+test('resolves TTF files for download without exposing traversal paths', async () => {
+  await withTempRoot(async (root) => {
+    await fs.writeFile(path.join(root, 'Inter.ttf'), 'font');
+
+    const download = await downloadFile('fonts', 'Inter', fontConfigFor(root));
+    assert.equal(download.id, 'Inter');
+    assert.equal(download.fileName, 'Inter.ttf');
+    assert.equal(download.filePath, path.join(root, 'Inter.ttf'));
+    assert.equal(download.contentType, 'font/ttf');
+    assert.equal(download.size, 4);
+
+    await assert.rejects(
+      downloadFile('fonts', '../Inter.ttf', fontConfigFor(root)),
+      /Invalid file name|Invalid asset name/
+    );
+    await assert.rejects(
+      downloadFile('fonts', 'Inter/../../secret.ttf', fontConfigFor(root)),
+      /Invalid file name/
+    );
   });
 });

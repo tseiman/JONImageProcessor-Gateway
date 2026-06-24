@@ -1,11 +1,12 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { URL } from 'node:url';
 import { loadConfig, publicConfig } from './config.js';
 import { extractToken, isAuthorized } from './auth.js';
 import { sendIpcRequest } from './ipcClient.js';
-import { deleteFile, httpError, listFiles, uploadFile } from './fileStore.js';
+import { deleteFile, downloadFile, httpError, listFiles, uploadFile } from './fileStore.js';
 import { handleUpgrade, setMutationPollRequester } from './websocket.js';
 import { prepareIpcRequest } from './ipcGateway.js';
 import { errorFields, log } from './logger.js';
@@ -142,6 +143,10 @@ const server = http.createServer(async (req, res) => {
         await writeJson(req, res, 200, { ok: true, files: await listFiles(root, config) });
         return;
       }
+      if (req.method === 'GET' && fileName) {
+        await writeDownload(req, res, await downloadFile(root, fileName, config));
+        return;
+      }
       if ((req.method === 'PUT' || req.method === 'POST') && fileName) {
         await writeJson(req, res, 201, { ok: true, file: await uploadFile(req, root, fileName, config) });
         return;
@@ -239,6 +244,22 @@ function writeCorsHeaders(req, res) {
     res.setHeader('access-control-allow-headers', 'authorization,x-api-token,content-type');
     res.setHeader('access-control-max-age', '600');
   }
+}
+
+async function writeDownload(req, res, file) {
+  writeCorsHeaders(req, res);
+  res.writeHead(200, {
+    'content-type': file.contentType,
+    'content-length': file.size,
+    'content-disposition': `attachment; filename="${safeHeaderFileName(file.fileName)}"`,
+    'last-modified': new Date(file.mtime).toUTCString(),
+    'cache-control': 'no-store'
+  });
+  await pipeline(fs.createReadStream(file.filePath), res);
+}
+
+function safeHeaderFileName(fileName) {
+  return path.basename(fileName).replace(/["\\\r\n]/g, '_');
 }
 
 function requestLogFields(req, url, requestId) {

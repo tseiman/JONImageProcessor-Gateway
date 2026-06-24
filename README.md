@@ -218,7 +218,7 @@ curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
 
 When a client sets `background.image` or `pause.image`, it sends the asset id, for example `studio-background`. The gateway reads that asset's `info.json`, resolves `startFile`, and forwards the relative package path such as `studio-background/background.jpg` to the `JONImageProcessor` Unix socket API.
 
-List, upload, and delete TTF pause fonts:
+List, upload, download, and delete TTF pause fonts:
 
 ```bash
 curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
@@ -228,11 +228,14 @@ curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   --data-binary @Inter-Regular.ttf \
   http://127.0.0.1:8080/api/files/fonts/Inter-Regular.ttf
 
+curl -OJ -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
+  http://127.0.0.1:8080/api/files/fonts/Inter-Regular
+
 curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/files/fonts/Inter-Regular
 ```
 
-For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`.
+For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. Downloads accept either the safe base name or the `.ttf` file name and reject traversal paths. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`.
 
 List, write, rename, apply, and delete overlay presets:
 
