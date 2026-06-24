@@ -28,7 +28,26 @@ Default deployment layout:
 /opt/JONImageProcessor-Gateway/etc/token.env
 ```
 
-Install the application from a checkout on the target machine:
+Install or update the application from a checkout on the target machine:
+
+```bash
+scripts/install-local.sh
+```
+
+The installer prints each step, aborts on the first failing command, runs `git pull --ff-only` when the checkout contains `.git`, installs runtime npm dependencies, writes `src/version-info.json`, stops the systemd service if it exists, copies the runtime files to `/opt/JONImageProcessor-Gateway`, and starts the service again. A failed `git pull`, blocked checkout, failed npm install, or failed copy is visible because the script exits non-zero.
+
+Common overrides:
+
+```bash
+RUN_GIT_PULL=0 scripts/install-local.sh
+PREFIX=/srv/JONImageProcessor-Gateway scripts/install-local.sh
+SERVICE_NAME=my-gateway.service scripts/install-local.sh
+INSTALL_CONFIG=always scripts/install-local.sh
+```
+
+`INSTALL_CONFIG` defaults to `missing`, so an existing `/opt/JONImageProcessor-Gateway/etc/gateway.config.json` is not overwritten. Use `always` only when intentionally replacing it.
+
+The manual equivalent is:
 
 ```bash
 npm install --omit=dev
