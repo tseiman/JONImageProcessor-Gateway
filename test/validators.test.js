@@ -6,7 +6,7 @@ const config = {
   api: {
     commands: {
       list: { enabled: true },
-      get: { enabled: true, keys: ['segmentation.threshold', 'benchmark', 'pause.fontDirectory'] },
+      get: { enabled: true, keys: ['segmentation.threshold', 'benchmark', 'pause.fontDirectory', 'secondaryCamera.device'] },
       set: {
         enabled: true,
         items: {
@@ -15,6 +15,7 @@ const config = {
           'background.effect': { type: 'string', enum: ['none', 'color', 'blur', 'image'] },
           'background.image': { type: 'string', pattern: '^[A-Za-z0-9._-]+$', maxLength: 120, assetRoot: 'backgrounds' },
           'config': { type: 'string', pattern: '^[A-Za-z0-9_-]+$', maxLength: 120 },
+          'pause.source': { type: 'string', enum: ['image', 'camera'] },
           'pause.font': { type: 'string', pattern: '^[A-Za-z0-9._-]+$', maxLength: 120 },
           'pause.fontAlign': { type: 'string', enum: ['left', 'center', 'right'] }
         }
@@ -72,8 +73,20 @@ test('allows safe TTF font base names and font alignment values', () => {
   });
 });
 
+test('allows pause source and secondary camera device reads', () => {
+  assert.deepEqual(validateIpcRequest({ cmd: 'set', key: 'pause.source', value: 'camera' }, config), {
+    ok: true,
+    request: { cmd: 'set', key: 'pause.source', value: 'camera' }
+  });
+  assert.deepEqual(validateIpcRequest({ cmd: 'get', key: 'secondaryCamera.device' }, config), {
+    ok: true,
+    request: { cmd: 'get', key: 'secondaryCamera.device' }
+  });
+});
+
 test('rejects unsafe TTF font names and invalid font alignment values', () => {
   assert.equal(validateIpcRequest({ cmd: 'set', key: 'pause.font', value: '../Inter' }, config).ok, false);
   assert.equal(validateIpcRequest({ cmd: 'set', key: 'pause.font', value: 'Inter/Regular' }, config).ok, false);
   assert.equal(validateIpcRequest({ cmd: 'set', key: 'pause.fontAlign', value: 'justify' }, config).ok, false);
+  assert.equal(validateIpcRequest({ cmd: 'set', key: 'pause.source', value: 'video' }, config).ok, false);
 });

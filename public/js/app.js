@@ -80,7 +80,7 @@ const STAGES = [
   },
   {
     title: 'PAUSE',
-    keys: ['pause.enabled', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font', 'pause.fontAlign']
+    keys: ['pause.enabled', 'pause.source', 'pause.image', 'pause.loopIfVideo', 'pause.showStatusText', 'pause.textColor', 'pause.textSize', 'pause.font', 'pause.fontAlign']
   }
 ];
 
@@ -98,6 +98,7 @@ const LABELS = {
   'background.overlayAlpha': 'Alpha',
   'background.overlayColor': 'Background Color',
   'pause.enabled': 'Pause Image',
+  'pause.source': 'Pause Source',
   'pause.image': 'Pause Asset',
   'pause.loopIfVideo': 'Loop Pause Video',
   'pause.showStatusText': 'Status Text',

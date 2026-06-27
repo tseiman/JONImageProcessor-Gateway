@@ -13,6 +13,7 @@ test('converts flat WebUI values to grouped overlay config', () => {
     'segmentation.threshold': 0.42,
     'background.effect': 'image',
     'background.image': 'office/index.html',
+    'pause.source': 'camera',
     'pause.textSize': 1.8,
     'camera.enabled': false,
     'system.version': 'ignored'
@@ -20,19 +21,20 @@ test('converts flat WebUI values to grouped overlay config', () => {
     camera: { enabled: false },
     segmentation: { threshold: 0.42 },
     background: { effect: 'image', image: 'office/index.html' },
-    pause: { textSize: 1.8 }
+    pause: { source: 'camera', textSize: 1.8 }
   });
 });
 
 test('extracts flat values from grouped overlay config', () => {
   assert.deepEqual(overlayConfigToValues({
     background: { effect: 'blur', blurStrength: 30 },
-    pause: { fontAlign: 'center' },
+    pause: { source: 'image', fontAlign: 'center' },
     camera: { enabled: false }
   }), {
     'camera.enabled': false,
     'background.effect': 'blur',
     'background.blurStrength': 30,
+    'pause.source': 'image',
     'pause.fontAlign': 'center'
   });
 });

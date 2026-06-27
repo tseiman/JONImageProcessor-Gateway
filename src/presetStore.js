@@ -20,6 +20,7 @@ const OVERLAY_KEYS = new Set([
   'background.overlayAlpha',
   'background.blurStrength',
   'pause.enabled',
+  'pause.source',
   'pause.image',
   'pause.loopIfVideo',
   'pause.showStatusText',

@@ -113,6 +113,10 @@ Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is acce
 
 TTF pause text fonts use the separate `fonts` file root. Upload plain `.ttf` files there; the WebUI lists them together with the built-in OpenCV Hershey fonts. When `pause.font` is set to `Inter-Regular`, JONImageProcessor loads `Inter-Regular.ttf` from the read-only IPC value `pause.fontDirectory`. On the Jetson deployment this directory should match the gateway `files.roots.fonts.path`, for example `/opt/JONImageProcessor/var/userdata/fonts`.
 
+`pause.source` selects what JONImageProcessor renders while the primary camera is paused, connecting, or disconnected and `pause.enabled=true`. `image` uses the configured pause asset from `pause.image`; `camera` uses the secondary camera device reported by IPC as `secondaryCamera.device`, for example a v4l2loopback/AirPlay device such as `/dev/video10`. The device path itself is startup configuration in JONImageProcessor and is read-only through the gateway.
+
+For existing deployments, add `pause.source` to `api.commands.get.keys`, add `secondaryCamera.device` to `api.commands.get.keys`, and add `"pause.source": { "type": "string", "enum": ["image", "camera"] }` to `api.commands.set.items` in `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`.
+
 A complete image asset example is available in `examples/assets/sample-background/`. See `examples/README.md` for ZIP and upload commands.
 
 ## Authentication
@@ -254,7 +258,7 @@ curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/files/fonts/Inter-Regular
 ```
 
-For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. Downloads accept either the safe base name or the `.ttf` file name and reject traversal paths. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`.
+For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. Downloads accept either the safe base name or the `.ttf` file name and reject traversal paths. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`. `pause.source` accepts `image` or `camera`; `secondaryCamera.device` is exposed as a read-only IPC value.
 
 List, write, rename, apply, and delete overlay presets:
 
@@ -293,6 +297,9 @@ Preset names are converted to JONImageProcessor-safe config names containing onl
   },
   "camera": {
     "enabled": true
+  },
+  "pause": {
+    "source": "image"
   },
   "background": {
     "effect": "blur",
