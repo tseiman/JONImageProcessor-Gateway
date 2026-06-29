@@ -4,7 +4,7 @@ set -Eeuo pipefail
 PREFIX="${PREFIX:-/opt/JONImageProcessor-Gateway}"
 SERVICE_NAME="${SERVICE_NAME:-jonimageprocessor-gateway.service}"
 RUN_GIT_PULL="${RUN_GIT_PULL:-1}"
-INSTALL_CONFIG="${INSTALL_CONFIG:-missing}"
+INSTALL_CONFIG="${INSTALL_CONFIG:-merge}"
 SUDO="${SUDO:-sudo}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -75,9 +75,20 @@ step "Copying application files"
 "$SUDO" cp -a node_modules package.json package-lock.json "$PREFIX/"
 
 CONFIG_TARGET="$PREFIX/etc/gateway.config.json"
-if [[ "$INSTALL_CONFIG" == "always" || ( "$INSTALL_CONFIG" == "missing" && ! -f "$CONFIG_TARGET" ) ]]; then
+if [[ "$INSTALL_CONFIG" == "always" || ( "$INSTALL_CONFIG" == "missing" && ! -f "$CONFIG_TARGET" ) || ( "$INSTALL_CONFIG" == "merge" && ! -f "$CONFIG_TARGET" ) ]]; then
   step "Installing example config"
   "$SUDO" cp config/gateway.config.example.json "$CONFIG_TARGET"
+elif [[ "$INSTALL_CONFIG" == "merge" ]]; then
+  step "Merging missing config defaults"
+  TMP_CONFIG="$(mktemp)"
+  CONFIG_BACKUP="$CONFIG_TARGET.$(date -u +%Y%m%dT%H%M%SZ).bak"
+  "$SUDO" cp "$CONFIG_TARGET" "$CONFIG_BACKUP"
+  "$SUDO" cp "$CONFIG_TARGET" "$TMP_CONFIG"
+  "$SUDO" chown "$(id -u):$(id -g)" "$TMP_CONFIG"
+  MERGE_CONFIG_BACKUP=0 node scripts/merge-gateway-config.js "$TMP_CONFIG" config/gateway.config.example.json
+  "$SUDO" cp "$TMP_CONFIG" "$CONFIG_TARGET"
+  rm -f "$TMP_CONFIG"
+  info "Backup written to $CONFIG_BACKUP"
 else
   step "Keeping existing config"
   info "$CONFIG_TARGET"

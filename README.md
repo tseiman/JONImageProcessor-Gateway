@@ -36,6 +36,8 @@ scripts/install-local.sh
 
 The installer prints each step, aborts on the first failing command, runs `git pull --ff-only` when the checkout contains `.git`, installs runtime npm dependencies, writes `src/version-info.json`, stops the systemd service if it exists, copies the runtime files to `/opt/JONImageProcessor-Gateway`, and starts the service again. A failed `git pull`, blocked checkout, failed npm install, or failed copy is visible because the script exits non-zero.
 
+By default the installer also merges missing schema entries from `config/gateway.config.example.json` into the active `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`. Existing local values, paths, tokens, and customized command rules are preserved; only missing keys/items are added, and a timestamped `.bak` copy is written before the merge. This keeps new WebUI controls visible after updates without replacing local configuration.
+
 Common overrides:
 
 ```bash
@@ -43,9 +45,10 @@ RUN_GIT_PULL=0 scripts/install-local.sh
 PREFIX=/srv/JONImageProcessor-Gateway scripts/install-local.sh
 SERVICE_NAME=my-gateway.service scripts/install-local.sh
 INSTALL_CONFIG=always scripts/install-local.sh
+INSTALL_CONFIG=missing scripts/install-local.sh
 ```
 
-`INSTALL_CONFIG` defaults to `missing`, so an existing `/opt/JONImageProcessor-Gateway/etc/gateway.config.json` is not overwritten. Use `always` only when intentionally replacing it.
+`INSTALL_CONFIG` defaults to `merge`. Use `missing` to keep the old behavior of creating the config only when absent. Use `always` only when intentionally replacing it with the example config.
 
 The manual equivalent is:
 
