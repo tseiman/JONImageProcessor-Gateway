@@ -23,6 +23,7 @@ const OVERLAY_KEYS = new Set([
   'pause.source',
   'pause.image',
   'pause.loopIfVideo',
+  'pause.preserveAspectRatio',
   'pause.showStatusText',
   'pause.textColor',
   'pause.textPosition',
