@@ -59,7 +59,6 @@
           "pause.image",
           "pause.folder",
           "pause.loopIfVideo",
-          "pause.preserveAspectRatio",
           "pause.showStatusText",
           "pause.textColor",
           "pause.textPosition",
@@ -91,7 +90,6 @@
           "pause.source": { "type": "string", "enum": ["image", "camera"] },
           "pause.image": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 120, "assetRoot": "pause" },
           "pause.loopIfVideo": { "type": "boolean" },
-          "pause.preserveAspectRatio": { "type": "boolean" },
           "pause.showStatusText": { "type": "boolean" },
           "pause.textColor": { "type": "string", "pattern": "^[0-9a-fA-F]{8}$" },
           "pause.textPosition": {
