@@ -36,7 +36,7 @@ scripts/install-local.sh
 
 The installer prints each step, aborts on the first failing command, runs `git pull --ff-only` when the checkout contains `.git`, installs runtime npm dependencies, writes `src/version-info.json`, stops the systemd service if it exists, copies the runtime files to `/opt/JONImageProcessor-Gateway`, and starts the service again. A failed `git pull`, blocked checkout, failed npm install, or failed copy is visible because the script exits non-zero.
 
-By default the installer also merges missing schema entries from `config/gateway.config.example.json` into the active `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`. Existing local values, paths, tokens, and customized command rules are preserved; only missing keys/items are added, and a timestamped `.bak` copy is written before the merge. This keeps new WebUI controls visible after updates without replacing local configuration.
+By default the installer also merges missing schema entries from `config/gateway.config.example.json` into the active `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`. Existing local values, paths, tokens, and customized command rules are preserved; only missing keys/items and enum values are added, and a timestamped `.bak` copy is written before the merge. This keeps new WebUI controls visible after updates without replacing local configuration.
 
 Common overrides:
 
@@ -116,9 +116,9 @@ Allowed `type` values are `Image`, `Video`, and `HTML App`. `startdatei` is acce
 
 TTF pause text fonts use the separate `fonts` file root. Upload plain `.ttf` files there; the WebUI lists them together with the built-in OpenCV Hershey fonts. When `pause.font` is set to `Inter-Regular`, JONImageProcessor loads `Inter-Regular.ttf` from the read-only IPC value `pause.fontDirectory`. On the Jetson deployment this directory should match the gateway `files.roots.fonts.path`, for example `/opt/JONImageProcessor/var/userdata/fonts`.
 
-`pause.source` selects what JONImageProcessor renders while the primary camera is paused, connecting, or disconnected and `pause.enabled=true`. `image` uses the configured pause asset from `pause.image`; `camera` uses the secondary camera pipeline reported by IPC as `secondaryCamera.pipeline`, for example a GStreamer appsink pipeline fed by AirPlay/uxplay. The pipeline itself is startup configuration in JONImageProcessor and is read-only through the gateway.
+`pause.source` selects what JONImageProcessor renders while the primary camera is paused, connecting, or disconnected and `pause.enabled=true`. `image` uses the configured pause asset from `pause.image`; `camera` uses the secondary camera RTP input reported by IPC as `secondaryCamera.rtpPort`. `background.effect=camera` uses the same secondary camera RTP input as an aspect-ratio-preserved replacement background behind the masked primary camera foreground. The RTP port itself is startup configuration in JONImageProcessor and is read-only through the gateway.
 
-For existing deployments, add `pause.source` and `secondaryCamera.pipeline` to `api.commands.get.keys`, and add `"pause.source": { "type": "string", "enum": ["image", "camera"] }` to `api.commands.set.items` in `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`.
+For existing deployments, add `pause.source` and `secondaryCamera.rtpPort` to `api.commands.get.keys`, add `"pause.source": { "type": "string", "enum": ["image", "camera"] }` to `api.commands.set.items`, and add `camera` to the `background.effect` enum in `/opt/JONImageProcessor-Gateway/etc/gateway.config.json`.
 
 A complete image asset example is available in `examples/assets/sample-background/`. See `examples/README.md` for ZIP and upload commands.
 
@@ -261,7 +261,7 @@ curl -X DELETE -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   http://127.0.0.1:8080/api/files/fonts/Inter-Regular
 ```
 
-For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. Downloads accept either the safe base name or the `.ttf` file name and reject traversal paths. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`. `pause.source` accepts `image` or `camera`; `secondaryCamera.pipeline` is exposed as a read-only IPC value.
+For TTF fonts, `pause.font` is set to the safe base name without `.ttf`. Downloads accept either the safe base name or the `.ttf` file name and reject traversal paths. `pause.fontDirectory` is queried over IPC and displayed by the WebUI, but it is not writable through the gateway. `pause.fontAlign` accepts `left`, `center`, or `right`. `pause.source` accepts `image` or `camera`; `background.effect` accepts `none`, `color`, `blur`, `image`, or `camera`; `secondaryCamera.rtpPort` is exposed as a read-only IPC value.
 
 List, write, rename, apply, and delete overlay presets:
 
@@ -271,7 +271,7 @@ curl -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
 
 curl -X PUT -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Meeting Room","values":{"camera.enabled":true,"background.effect":"blur","background.blurStrength":30}}' \
+  -d '{"name":"Meeting Room","values":{"camera.enabled":true,"background.effect":"camera"}}' \
   http://127.0.0.1:8080/api/presets/meeting-room
 
 curl -X POST -H "Authorization: Bearer $JON_GATEWAY_TOKEN" \

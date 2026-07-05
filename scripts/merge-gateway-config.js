@@ -59,7 +59,7 @@ function mergeDefaults(targetValue, sourceValue, keyPath, changes) {
 
 function mergeArray(targetArray, sourceArray, keyPath, changes) {
   const keyName = keyPath.at(-1);
-  if (keyName !== 'keys') return targetArray;
+  if (keyName !== 'keys' && keyName !== 'enum') return targetArray;
 
   const result = [...targetArray];
   const seen = new Set(result);
