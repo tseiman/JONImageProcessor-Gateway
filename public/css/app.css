@@ -80,6 +80,14 @@ button, input, select {
   min-width: 92px;
 }
 
+#cpuStatus {
+  min-width: 74px;
+}
+
+#memoryStatus {
+  min-width: 92px;
+}
+
 .fps-sparkline {
   width: 40px;
   height: 14px;

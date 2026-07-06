@@ -19,6 +19,7 @@ const state = {
   fpsHistory: [],
   lastFpsPaintMs: 0,
   lastFpsGraphSampleMs: 0,
+  lastIpcMessageMs: 0,
   presets: [],
   presetDialogMode: 'save',
   presetDialogPresetId: '',
@@ -35,10 +36,11 @@ const elements = {
   message: document.querySelector('#message'),
   connectionStatus: document.querySelector('#connectionStatus'),
   fpsStatus: document.querySelector('#fpsStatus'),
+  cpuStatus: document.querySelector('#cpuStatus'),
+  memoryStatus: document.querySelector('#memoryStatus'),
   latencyStatus: document.querySelector('#latencyStatus'),
   jipVersionStatus: document.querySelector('#jipVersionStatus'),
   versionStatus: document.querySelector('#versionStatus'),
-  ipcStatus: document.querySelector('#ipcStatus'),
   presetList: document.querySelector('#presetList'),
   savePresetButton: document.querySelector('#savePresetButton'),
   importPresetsButton: document.querySelector('#importPresetsButton'),
@@ -139,11 +141,19 @@ async function ipc(request) {
     body: JSON.stringify(request)
   });
   elements.latencyStatus.textContent = `Latency ${Math.round(performance.now() - started)}ms`;
-  elements.ipcStatus.textContent = request.key ? request.key : request.cmd;
+  showIpcStatus(request);
   return data;
 }
 
-function showMessage(text, error = false) {
+function showIpcStatus(request) {
+  if (elements.message.classList.contains('error')) return;
+  const now = performance.now();
+  if (now - state.lastIpcMessageMs < 800) return;
+  state.lastIpcMessageMs = now;
+  showMessage(`IPC ${request.key ? `${request.cmd} ${request.key}` : request.cmd}`, false, 1200);
+}
+
+function showMessage(text, error = false, timeoutMs = error ? 7000 : 3000) {
   elements.message.textContent = text;
   elements.message.classList.toggle('error', error);
   elements.message.classList.add('visible');
@@ -151,7 +161,7 @@ function showMessage(text, error = false) {
   showMessage.timer = setTimeout(() => {
     elements.message.textContent = '';
     elements.message.classList.remove('visible', 'error');
-  }, error ? 7000 : 3000);
+  }, timeoutMs);
 }
 
 function readConfirmTimeout() {
@@ -236,6 +246,8 @@ function flattenValues(source, prefix = '', out = {}) {
 
 function updateBenchmark(benchmark) {
   const fps = readFpsValue(benchmark);
+  updateCpuStatus(benchmark);
+  updateMemoryStatus(benchmark);
   const label = elements.fpsStatus.querySelector('.fps-label');
   const polyline = elements.fpsStatus.querySelector('polyline');
   const polygon = elements.fpsStatus.querySelector('polygon');
@@ -258,6 +270,25 @@ function updateBenchmark(benchmark) {
     if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
     if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
   }
+}
+
+function updateCpuStatus(benchmark) {
+  const cpu = readCpuValue(benchmark);
+  elements.cpuStatus.textContent = Number.isFinite(cpu) ? `CPU ${formatPercent(cpu)}` : 'CPU --';
+  elements.cpuStatus.title = Number.isFinite(cpu)
+    ? 'Average JONImageProcessor process CPU since startup'
+    : 'CPU benchmark value not reported';
+}
+
+function updateMemoryStatus(benchmark) {
+  const memory = readMemoryValue(benchmark);
+  const peak = readPeakMemoryValue(benchmark);
+  elements.memoryStatus.textContent = Number.isFinite(memory) ? `MEM ${formatBytes(memory)}` : 'MEM --';
+  elements.memoryStatus.title = Number.isFinite(peak)
+    ? `RSS ${formatBytes(memory)}, peak ${formatBytes(peak)}`
+    : Number.isFinite(memory)
+      ? 'Current JONImageProcessor resident memory'
+      : 'Memory benchmark value not reported';
 }
 
 function readFpsValue(benchmark) {
@@ -304,12 +335,86 @@ function readFpsValue(benchmark) {
   );
 }
 
+function readCpuValue(benchmark) {
+  if (benchmark && typeof benchmark === 'object') {
+    const cpu = firstFiniteNumber(
+      benchmark.cpu_percent,
+      benchmark.cpuPercent,
+      benchmark.cpu,
+      benchmark.processCpuPercent
+    );
+    if (Number.isFinite(cpu)) return cpu;
+  }
+  return firstFiniteNumber(
+    state.values['benchmark.cpu_percent'],
+    state.values['benchmark.cpuPercent'],
+    state.values['benchmark.cpu'],
+    state.values['benchmark.processCpuPercent'],
+    state.values['cpu_percent'],
+    state.values['cpuPercent']
+  );
+}
+
+function readMemoryValue(benchmark) {
+  if (benchmark && typeof benchmark === 'object') {
+    const memory = firstFiniteNumber(
+      benchmark.memory_rss_bytes,
+      benchmark.memoryRssBytes,
+      benchmark.rssBytes,
+      benchmark.memory
+    );
+    if (Number.isFinite(memory)) return memory;
+  }
+  return firstFiniteNumber(
+    state.values['benchmark.memory_rss_bytes'],
+    state.values['benchmark.memoryRssBytes'],
+    state.values['benchmark.rssBytes'],
+    state.values['benchmark.memory'],
+    state.values['memory_rss_bytes'],
+    state.values['memoryRssBytes']
+  );
+}
+
+function readPeakMemoryValue(benchmark) {
+  if (benchmark && typeof benchmark === 'object') {
+    const memory = firstFiniteNumber(
+      benchmark.memory_peak_rss_bytes,
+      benchmark.memoryPeakRssBytes,
+      benchmark.peakRssBytes
+    );
+    if (Number.isFinite(memory)) return memory;
+  }
+  return firstFiniteNumber(
+    state.values['benchmark.memory_peak_rss_bytes'],
+    state.values['benchmark.memoryPeakRssBytes'],
+    state.values['benchmark.peakRssBytes'],
+    state.values['memory_peak_rss_bytes'],
+    state.values['memoryPeakRssBytes']
+  );
+}
+
 function firstFiniteNumber(...values) {
   for (const value of values) {
     const number = Number(value);
     if (Number.isFinite(number)) return number;
   }
   return NaN;
+}
+
+function formatPercent(value) {
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)}%`;
+}
+
+function formatBytes(bytes) {
+  const units = ['B', 'KiB', 'MiB', 'GiB'];
+  let value = Math.max(0, Number(bytes));
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 || value >= 100 ? 0 : 1;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
 }
 
 function rangeText(min, max) {
