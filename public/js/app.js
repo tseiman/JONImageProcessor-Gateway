@@ -17,8 +17,10 @@ const state = {
   schema: null,
   values: {},
   fpsHistory: [],
+  cpuHistory: [],
   lastFpsPaintMs: 0,
   lastFpsGraphSampleMs: 0,
+  lastCpuGraphSampleMs: 0,
   lastIpcMessageMs: 0,
   presets: [],
   presetDialogMode: 'save',
@@ -253,8 +255,8 @@ function updateBenchmark(benchmark) {
   const polygon = elements.fpsStatus.querySelector('polygon');
   if (!Number.isFinite(fps)) {
     if (label) label.textContent = 'FPS --';
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory, 20));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory, 20));
     return;
   }
 
@@ -267,17 +269,37 @@ function updateBenchmark(benchmark) {
     state.lastFpsGraphSampleMs = now;
     state.fpsHistory.push(fps);
     if (state.fpsHistory.length > 32) state.fpsHistory.shift();
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory));
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory, 20));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory, 20));
   }
 }
 
 function updateCpuStatus(benchmark) {
   const cpu = readCpuValue(benchmark);
-  elements.cpuStatus.textContent = Number.isFinite(cpu) ? `CPU ${formatPercent(cpu)}` : 'CPU --';
+  const label = elements.cpuStatus.querySelector('.cpu-label');
+  const polyline = elements.cpuStatus.querySelector('polyline');
+  const polygon = elements.cpuStatus.querySelector('polygon');
+  if (!Number.isFinite(cpu)) {
+    if (label) label.textContent = 'CPU --';
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, 100));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, 100));
+    elements.cpuStatus.title = 'CPU benchmark value not reported';
+    return;
+  }
+
+  if (label) label.textContent = `CPU ${formatPercent(cpu)}`;
   elements.cpuStatus.title = Number.isFinite(cpu)
     ? 'Average JONImageProcessor process CPU since startup'
     : 'CPU benchmark value not reported';
+
+  const now = performance.now();
+  if (state.cpuHistory.length === 0 || now - state.lastCpuGraphSampleMs >= 2700) {
+    state.lastCpuGraphSampleMs = now;
+    state.cpuHistory.push(cpu);
+    if (state.cpuHistory.length > 32) state.cpuHistory.shift();
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, 100));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, 100));
+  }
 }
 
 function updateMemoryStatus(benchmark) {
@@ -495,25 +517,24 @@ function pictureDimensionSignature(dimensions = pictureDimensions()) {
   return `${dimensions.width}x${dimensions.height}`;
 }
 
-function sparklinePoints(values) {
+function sparklinePoints(values, maxValue) {
   if (!values.length) return '';
-  return sparklineCoordinates(values).join(' ');
+  return sparklineCoordinates(values, maxValue).join(' ');
 }
 
-function sparklineAreaPoints(values) {
+function sparklineAreaPoints(values, maxValue) {
   if (!values.length) return '';
-  const line = sparklineCoordinates(values);
+  const line = sparklineCoordinates(values, maxValue);
   return `0,14 ${line.join(' ')} 40,14`;
 }
 
-function sparklineCoordinates(values) {
+function sparklineCoordinates(values, maxValue) {
   const width = 40;
   const height = 14;
-  const maxFps = 20;
   const plottedValues = values.length === 1 ? [values[0], values[0]] : values;
   return plottedValues.map((value, index) => {
     const x = (index / (plottedValues.length - 1)) * width;
-    const y = height - ((clamp(value, 0, maxFps) / maxFps) * (height - 2)) - 1;
+    const y = height - ((clamp(value, 0, maxValue) / maxValue) * (height - 2)) - 1;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
 }
@@ -1227,27 +1248,28 @@ function enumShortLabel(option) {
 
 function enumIcon(option) {
   const icons = {
-    camera: '◉',
+    camera: '🎥',
     center: '≡',
-    color: '●',
+    color: '🎨',
     complex: 'C',
     'complex-small': 'c',
     duplex: 'D',
     highgui: '▣',
-    image: '▧',
+    image: '🖼',
     left: '≡',
-    light: '◐',
+    light: '🪶',
     mjpg: 'M',
-    none: '–',
-    off: '×',
+    none: '⭕',
+    off: '⭕',
     plain: 'P',
     right: '≡',
     'script-complex': 'S',
     'script-simplex': 's',
     simplex: 'S',
-    strong: '●',
+    strong: '💪',
     triplex: 'T',
     video: '▶',
+    blur: '🌫',
     yuyv: 'Y'
   };
   const key = String(option).toLowerCase();

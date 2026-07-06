@@ -19,14 +19,20 @@
     <div id="message" class="message" aria-live="polite"></div>
     <div class="status">
       <b id="connectionStatus">Disconnected</b>
-      <span id="fpsStatus" class="fps-status">
+      <span id="fpsStatus" class="metric-status fps-status">
         <span class="fps-label">FPS --</span>
-        <svg class="fps-sparkline" viewBox="0 0 40 14" aria-hidden="true">
+        <svg class="metric-sparkline fps-sparkline" viewBox="0 0 40 14" aria-hidden="true">
           <polygon points=""></polygon>
           <polyline points=""></polyline>
         </svg>
       </span>
-      <span id="cpuStatus">CPU --</span>
+      <span id="cpuStatus" class="metric-status cpu-status">
+        <span class="cpu-label">CPU --</span>
+        <svg class="metric-sparkline cpu-sparkline" viewBox="0 0 40 14" aria-hidden="true">
+          <polygon points=""></polygon>
+          <polyline points=""></polyline>
+        </svg>
+      </span>
       <span id="memoryStatus">MEM --</span>
       <span id="latencyStatus">Latency --</span>
       <span id="jipVersionStatus">JIP git --</span>

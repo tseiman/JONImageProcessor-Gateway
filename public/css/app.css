@@ -73,7 +73,7 @@ button, input, select {
   color: var(--green);
 }
 
-.fps-status {
+.metric-status {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -81,24 +81,24 @@ button, input, select {
 }
 
 #cpuStatus {
-  min-width: 74px;
+  min-width: 118px;
 }
 
 #memoryStatus {
   min-width: 92px;
 }
 
-.fps-sparkline {
+.metric-sparkline {
   width: 40px;
   height: 14px;
   overflow: visible;
 }
 
-.fps-sparkline polygon {
+.metric-sparkline polygon {
   fill: rgba(56, 216, 120, 0.4);
 }
 
-.fps-sparkline polyline {
+.metric-sparkline polyline {
   fill: none;
   stroke: var(--green);
   stroke-width: 1.8;
