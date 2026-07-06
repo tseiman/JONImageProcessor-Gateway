@@ -289,7 +289,7 @@ function updateCpuStatus(benchmark) {
 
   if (label) label.textContent = `CPU ${formatPercent(cpu)}`;
   elements.cpuStatus.title = Number.isFinite(cpu)
-    ? 'Average JONImageProcessor process CPU since startup'
+    ? 'Current JONImageProcessor process CPU'
     : 'CPU benchmark value not reported';
 
   const now = performance.now();
@@ -320,10 +320,11 @@ function updateMemoryStatus(benchmark) {
 function readFpsValue(benchmark) {
   if (benchmark && typeof benchmark === 'object') {
     const fps = firstFiniteNumber(
+      benchmark.current_fps,
+      benchmark.currentFps,
       benchmark.fps,
       benchmark.framesPerSecond,
       benchmark.averageFps,
-      benchmark.currentFps,
       benchmark.avgFps,
       benchmark.processingFps,
       benchmark.pipelineFps,
@@ -332,29 +333,29 @@ function readFpsValue(benchmark) {
     if (Number.isFinite(fps)) return fps;
   }
   return firstFiniteNumber(
+    state.values['benchmark.current_fps'],
+    state.values['benchmark.currentFps'],
+    state.values['current_fps'],
+    state.values['currentFps'],
     state.values['benchmark.fps'],
     state.values['benchmark.framesPerSecond'],
     state.values['benchmark.averageFps'],
-    state.values['benchmark.currentFps'],
     state.values['benchmark.avgFps'],
     state.values['benchmark.processingFps'],
     state.values['benchmark.pipelineFps'],
     state.values['benchmark.videoFps'],
     state.values['benchmark.average_fps'],
-    state.values['benchmark.current_fps'],
     state.values['benchmark.processing_fps'],
     state.values['benchmark.pipeline_fps'],
     state.values['benchmark.video_fps'],
     state.values['fps'],
     state.values['framesPerSecond'],
     state.values['averageFps'],
-    state.values['currentFps'],
     state.values['avgFps'],
     state.values['processingFps'],
     state.values['pipelineFps'],
     state.values['videoFps'],
     state.values['average_fps'],
-    state.values['current_fps'],
     state.values['processing_fps'],
     state.values['pipeline_fps'],
     state.values['video_fps']
@@ -364,6 +365,8 @@ function readFpsValue(benchmark) {
 function readCpuValue(benchmark) {
   if (benchmark && typeof benchmark === 'object') {
     const cpu = firstFiniteNumber(
+      benchmark.cpu_current_percent,
+      benchmark.cpuCurrentPercent,
       benchmark.cpu_percent,
       benchmark.cpuPercent,
       benchmark.cpu,
@@ -372,6 +375,10 @@ function readCpuValue(benchmark) {
     if (Number.isFinite(cpu)) return cpu;
   }
   return firstFiniteNumber(
+    state.values['benchmark.cpu_current_percent'],
+    state.values['benchmark.cpuCurrentPercent'],
+    state.values['cpu_current_percent'],
+    state.values['cpuCurrentPercent'],
     state.values['benchmark.cpu_percent'],
     state.values['benchmark.cpuPercent'],
     state.values['benchmark.cpu'],
