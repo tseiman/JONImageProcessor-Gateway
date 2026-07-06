@@ -1154,7 +1154,7 @@ function renderEnumControl(key, rule) {
   group.className = 'enum';
   for (const option of rule.enum) {
     const button = document.createElement('button');
-    button.textContent = title(option);
+    renderEnumButtonContent(button, option);
     button.dataset.value = option;
     button.classList.toggle('active', state.values[key] === option);
     button.addEventListener('click', () => setValue(key, option));
@@ -1169,6 +1169,89 @@ function updateEnumControl(control, key) {
   control.querySelectorAll('button[data-value]').forEach((button) => {
     button.classList.toggle('active', button.dataset.value === value);
   });
+}
+
+function renderEnumButtonContent(button, option) {
+  const label = title(option);
+  button.type = 'button';
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = '';
+
+  const fullLabel = document.createElement('span');
+  fullLabel.className = 'enum-label enum-label-full';
+  fullLabel.textContent = label;
+
+  const shortLabel = document.createElement('span');
+  shortLabel.className = 'enum-label enum-label-short';
+  shortLabel.textContent = enumShortLabel(option);
+
+  const icon = document.createElement('span');
+  icon.className = 'enum-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = enumIcon(option);
+
+  button.append(fullLabel, shortLabel, icon);
+}
+
+function enumShortLabel(option) {
+  const labels = {
+    camera: 'Cam',
+    center: 'Ctr',
+    color: 'Clr',
+    complex: 'Cmplx',
+    'complex-small': 'Csm',
+    duplex: 'Dup',
+    highgui: 'GUI',
+    image: 'Img',
+    left: 'Left',
+    light: 'Lite',
+    mjpg: 'MJPG',
+    none: 'None',
+    off: 'Off',
+    plain: 'Plain',
+    right: 'Right',
+    'script-complex': 'ScrC',
+    'script-simplex': 'ScrS',
+    simplex: 'Splx',
+    strong: 'Str',
+    triplex: 'Tplx',
+    video: 'Vid',
+    yuyv: 'YUYV'
+  };
+  const key = String(option).toLowerCase();
+  if (labels[key]) return labels[key];
+  const label = title(option);
+  return label.length <= 5 ? label : label.slice(0, 4);
+}
+
+function enumIcon(option) {
+  const icons = {
+    camera: '◉',
+    center: '≡',
+    color: '●',
+    complex: 'C',
+    'complex-small': 'c',
+    duplex: 'D',
+    highgui: '▣',
+    image: '▧',
+    left: '≡',
+    light: '◐',
+    mjpg: 'M',
+    none: '–',
+    off: '×',
+    plain: 'P',
+    right: '≡',
+    'script-complex': 'S',
+    'script-simplex': 's',
+    simplex: 'S',
+    strong: '●',
+    triplex: 'T',
+    video: '▶',
+    yuyv: 'Y'
+  };
+  const key = String(option).toLowerCase();
+  return icons[key] || enumShortLabel(option).slice(0, 1).toUpperCase();
 }
 
 function renderFontAlignControl(key, rule) {

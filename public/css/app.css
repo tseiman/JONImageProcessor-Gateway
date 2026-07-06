@@ -381,9 +381,39 @@ button:disabled {
   gap: 8px;
 }
 
+.enum {
+  container-type: inline-size;
+}
+
 .toggle button, .enum button {
   flex: 1;
   min-width: 0;
+}
+
+.enum button {
+  overflow: hidden;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enum-label {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.enum-label-short,
+.enum-icon {
+  display: none;
+}
+
+.enum-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .toggle .active {
@@ -398,6 +428,31 @@ button:disabled {
 .font-align button {
   display: grid;
   place-items: center;
+}
+
+@container (max-width: 280px) {
+  .enum .enum-label-full {
+    display: none;
+  }
+
+  .enum .enum-label-short {
+    display: inline-block;
+  }
+}
+
+@container (max-width: 190px) {
+  .enum button {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .enum .enum-label-short {
+    display: none;
+  }
+
+  .enum .enum-icon {
+    display: inline-block;
+  }
 }
 
 .align-icon {
