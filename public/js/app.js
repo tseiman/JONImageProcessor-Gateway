@@ -281,8 +281,8 @@ function updateCpuStatus(benchmark) {
   const polygon = elements.cpuStatus.querySelector('polygon');
   if (!Number.isFinite(cpu)) {
     if (label) label.textContent = 'CPU --';
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, 100));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, 100));
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, cpuSparklineMax()));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, cpuSparklineMax()));
     elements.cpuStatus.title = 'CPU benchmark value not reported';
     return;
   }
@@ -297,9 +297,13 @@ function updateCpuStatus(benchmark) {
     state.lastCpuGraphSampleMs = now;
     state.cpuHistory.push(cpu);
     if (state.cpuHistory.length > 32) state.cpuHistory.shift();
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, 100));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, 100));
+    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, cpuSparklineMax()));
+    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, cpuSparklineMax()));
   }
+}
+
+function cpuSparklineMax() {
+  return Math.max(1, ...state.cpuHistory);
 }
 
 function updateMemoryStatus(benchmark) {
