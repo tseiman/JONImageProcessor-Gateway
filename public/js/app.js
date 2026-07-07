@@ -38,6 +38,7 @@ const elements = {
   cpuStatus: document.querySelector('#cpuStatus'),
   memoryStatus: document.querySelector('#memoryStatus'),
   latencyStatus: document.querySelector('#latencyStatus'),
+  secondScreenStatus: document.querySelector('#secondScreenStatus'),
   jipVersionStatus: document.querySelector('#jipVersionStatus'),
   versionStatus: document.querySelector('#versionStatus'),
   presetList: document.querySelector('#presetList'),
@@ -247,6 +248,7 @@ function updateBenchmark(benchmark) {
   const fps = readFpsValue(benchmark);
   updateCpuStatus(benchmark);
   updateMemoryStatus(benchmark);
+  updateSecondScreenStatus(benchmark);
   const label = elements.fpsStatus.querySelector('.fps-label');
   const polyline = elements.fpsStatus.querySelector('polyline');
   const polygon = elements.fpsStatus.querySelector('polygon');
@@ -302,6 +304,14 @@ function updateMemoryStatus(benchmark) {
     : Number.isFinite(memory)
       ? 'Current JONImageProcessor resident memory'
       : 'Memory benchmark value not reported';
+}
+
+function updateSecondScreenStatus(benchmark) {
+  const secondScreen = readSecondScreenValue(benchmark);
+  const label = secondScreen ? 'Dual screen' : 'Single screen';
+  elements.secondScreenStatus.src = secondScreen ? '/img/dual-screen.svg' : '/img/single-screen.svg';
+  elements.secondScreenStatus.alt = label;
+  elements.secondScreenStatus.title = label;
 }
 
 function readFpsValue(benchmark) {
@@ -413,12 +423,23 @@ function readPeakMemoryValue(benchmark) {
   );
 }
 
+function readSecondScreenValue(benchmark) {
+  if (benchmark && typeof benchmark === 'object' && benchmark.secondScreen !== undefined) {
+    return booleanValue(benchmark.secondScreen);
+  }
+  return booleanValue(state.values['benchmark.secondScreen']);
+}
+
 function firstFiniteNumber(...values) {
   for (const value of values) {
     const number = Number(value);
     if (Number.isFinite(number)) return number;
   }
   return NaN;
+}
+
+function booleanValue(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
 }
 
 function formatPercent(value) {

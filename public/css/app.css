@@ -88,6 +88,13 @@ button, input, select {
   min-width: 92px;
 }
 
+.screen-status-icon {
+  width: 24px;
+  height: 20px;
+  display: inline-block;
+  object-fit: contain;
+}
+
 .metric-sparkline {
   width: 40px;
   height: 14px;

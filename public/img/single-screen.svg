@@ -1,0 +1,3 @@
+<svg viewBox="0 0 256 256" role="img" aria-label="Single screen" xmlns="http://www.w3.org/2000/svg">
+  <path fill="currentColor" d="M48 48h160c13.255 0 24 10.745 24 24v96c0 13.255-10.745 24-24 24h-58v24h38c6.627 0 12 5.373 12 12s-5.373 12-12 12H68c-6.627 0-12-5.373-12-12s5.373-12 12-12h38v-24H48c-13.255 0-24-10.745-24-24V72c0-13.255 10.745-24 24-24Zm0 24v88h160V72H48Zm80 104a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" style="fill:#8d98a8;fill-opacity:1"/>
+</svg>
