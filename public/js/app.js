@@ -18,9 +18,6 @@ const state = {
   values: {},
   fpsHistory: [],
   cpuHistory: [],
-  lastFpsPaintMs: 0,
-  lastFpsGraphSampleMs: 0,
-  lastCpuGraphSampleMs: 0,
   lastIpcMessageMs: 0,
   presets: [],
   presetDialogMode: 'save',
@@ -260,18 +257,12 @@ function updateBenchmark(benchmark) {
     return;
   }
 
-  const now = performance.now();
-  if (state.fpsHistory.length > 0 && now - state.lastFpsPaintMs < 900) return;
-  state.lastFpsPaintMs = now;
   if (label) label.textContent = `FPS ${fps.toFixed(1)}`;
 
-  if (state.fpsHistory.length === 0 || now - state.lastFpsGraphSampleMs >= 2700) {
-    state.lastFpsGraphSampleMs = now;
-    state.fpsHistory.push(fps);
-    if (state.fpsHistory.length > 32) state.fpsHistory.shift();
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory, 20));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory, 20));
-  }
+  state.fpsHistory.push(fps);
+  if (state.fpsHistory.length > 32) state.fpsHistory.shift();
+  if (polyline) polyline.setAttribute('points', sparklinePoints(state.fpsHistory, 20));
+  if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.fpsHistory, 20));
 }
 
 function updateCpuStatus(benchmark) {
@@ -292,14 +283,10 @@ function updateCpuStatus(benchmark) {
     ? 'Current JONImageProcessor process CPU'
     : 'CPU benchmark value not reported';
 
-  const now = performance.now();
-  if (state.cpuHistory.length === 0 || now - state.lastCpuGraphSampleMs >= 2700) {
-    state.lastCpuGraphSampleMs = now;
-    state.cpuHistory.push(cpu);
-    if (state.cpuHistory.length > 32) state.cpuHistory.shift();
-    if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, cpuSparklineMax()));
-    if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, cpuSparklineMax()));
-  }
+  state.cpuHistory.push(cpu);
+  if (state.cpuHistory.length > 32) state.cpuHistory.shift();
+  if (polyline) polyline.setAttribute('points', sparklinePoints(state.cpuHistory, cpuSparklineMax()));
+  if (polygon) polygon.setAttribute('points', sparklineAreaPoints(state.cpuHistory, cpuSparklineMax()));
 }
 
 function cpuSparklineMax() {
