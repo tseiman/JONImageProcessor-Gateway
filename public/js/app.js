@@ -439,7 +439,7 @@ function firstFiniteNumber(...values) {
 }
 
 function booleanValue(value) {
-  return value === true || value === 'true' || value === 1 || value === '1';
+  return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true';
 }
 
 function formatPercent(value) {
@@ -642,6 +642,7 @@ function closeWebSocket() {
 }
 
 function applyState(nextState) {
+  const benchmark = benchmarkFromState(nextState);
   const flat = flattenValues(nextState);
   const changedKeys = [];
   for (const [key, value] of Object.entries(flat)) {
@@ -658,7 +659,14 @@ function applyState(nextState) {
     if (!valuesEquivalent(key, state.values[key], value)) changedKeys.push(key);
     state.values[key] = value;
   }
+  if (benchmark) state.values.benchmark = benchmark;
   return changedKeys;
+}
+
+function benchmarkFromState(nextState) {
+  if (nextState?.benchmark && typeof nextState.benchmark === 'object') return nextState.benchmark;
+  if (nextState?.values?.benchmark && typeof nextState.values.benchmark === 'object') return nextState.values.benchmark;
+  return null;
 }
 
 function valuesEquivalent(key, actual, expected) {

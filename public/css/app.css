@@ -89,10 +89,11 @@ button, input, select {
 }
 
 .screen-status-icon {
-  width: 24px;
-  height: 20px;
+  width: 18px;
+  height: 14px;
   display: inline-block;
   object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .metric-sparkline {
